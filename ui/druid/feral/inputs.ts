@@ -17,7 +17,7 @@ export const AssumeBleedActive = InputHelpers.makeSpecOptionsBooleanInput<Spec.S
 
 function ShouldShowAdvParamST(player: Player<Spec.SpecFeralDruid>): boolean {
 	const rot = player.getSimpleRotation();
-	return rot.manualParams && rot.rotationType == AplType.SingleTarget;
+	return rot.manualParams && (rot.rotationType == AplType.SingleTarget || rot.rotationType == AplType.TranzSpecial);
 }
 
 function ShouldShowAdvParamAoe(player: Player<Spec.SpecFeralDruid>): boolean {
@@ -33,6 +33,7 @@ export const FeralDruidRotationConfig = {
 			values: [
 				{ name: 'Single Target', value: AplType.SingleTarget },
 				{ name: 'AOE', value: AplType.Aoe },
+				{ name: 'Tranz Special', value: AplType.TranzSpecial},
 			],
 		}),
 		InputHelpers.makeRotationBooleanInput<Spec.SpecFeralDruid>({

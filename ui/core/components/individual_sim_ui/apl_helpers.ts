@@ -680,6 +680,7 @@ export function rotationTypeFieldConfig(field: string): APLPickerBuilderFieldCon
 	const values = [
 		{ value: FeralDruid_Rotation_AplType.SingleTarget, label: 'Single Target' },
 		{ value: FeralDruid_Rotation_AplType.Aoe, label: 'AOE' },
+		{ value: FeralDruid_Rotation_AplType.TranzSpecial, label: 'Tranz Special'},
 	];
 
 	return {

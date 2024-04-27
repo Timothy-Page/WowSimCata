@@ -147,6 +147,7 @@ message FeralDruid {
 	enum AplType {
 		SingleTarget = 0;
 		Aoe = 1;
+		TranzSpecial = 2;
 	}
     enum BearweaveType {
       None = 0;

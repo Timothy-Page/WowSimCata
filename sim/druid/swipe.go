@@ -78,7 +78,8 @@ func (druid *Druid) registerSwipeCatSpell() {
 }
 
 func (druid *Druid) CurrentSwipeCatCost() float64 {
-	return druid.SwipeCat.ApplyCostModifiers(druid.SwipeCat.DefaultCast.Cost)
+	// druid.SwipeCat.ApplyCostModifiers(druid.SwipeCat.DefaultCast.Cost)
+	return 20
 }
 
 func (druid *Druid) IsSwipeSpell(spell *core.Spell) bool {
