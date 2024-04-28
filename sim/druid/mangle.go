@@ -127,3 +127,17 @@ func (druid *Druid) IsMangle(spell *core.Spell) bool {
 	}
 	return false
 }
+
+func (druid *Druid) MustMangle(sim *core.Simulation, target *core.Unit) bool {
+	mangleAuras := druid.NewEnemyAuraArray(core.MangleAura)
+	FFRefreshWindow := time.Second*0
+
+	return mangleAuras.Get(target).ShouldRefreshExclusiveEffects(sim, FFRefreshWindow)
+}
+
+func (druid *Druid) ShouldMangle(sim *core.Simulation, target *core.Unit) bool {
+	mangleAuras := druid.NewEnemyAuraArray(core.MangleAura)
+	FFRefreshWindow := time.Second*6
+
+	return mangleAuras.Get(target).ShouldRefreshExclusiveEffects(sim, FFRefreshWindow)
+}

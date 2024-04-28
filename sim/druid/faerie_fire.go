@@ -91,6 +91,8 @@ func (druid *Druid) TryApplyFaerieFireEffect(sim *core.Simulation, target *core.
 }
 
 func (druid *Druid) ShouldFaerieFire(sim *core.Simulation, target *core.Unit) bool {
+	FFRefreshWindow := time.Second*6
+
 	if druid.FaerieFire == nil {
 		return false
 	}
@@ -99,5 +101,19 @@ func (druid *Druid) ShouldFaerieFire(sim *core.Simulation, target *core.Unit) bo
 		return false
 	}
 
-	return druid.FaerieFireAuras.Get(target).ShouldRefreshExclusiveEffects(sim, time.Second*6)
+	return druid.FaerieFireAuras.Get(target).ShouldRefreshExclusiveEffects(sim, FFRefreshWindow)
+}
+
+func (druid *Druid) MustFaerieFire(sim *core.Simulation, target *core.Unit) bool {
+	FFRefreshWindow := time.Second*1
+
+	if druid.FaerieFire == nil {
+		return false
+	}
+
+	if !druid.FaerieFire.IsReady(sim) {
+		return false
+	}
+
+	return druid.FaerieFireAuras.Get(target).ShouldRefreshExclusiveEffects(sim, FFRefreshWindow)
 }

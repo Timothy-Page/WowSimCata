@@ -149,8 +149,10 @@ func (action *APLActionCatOptimalRotationAction) Execute(sim *core.Simulation) {
 		return
 	}
 
-	cat.TryTigersFury(sim)
-	cat.TryBerserk(sim)
+	if !(cat.Rotation.RotationType == proto.FeralDruid_Rotation_TranzSpecial) {
+		cat.TryTigersFury(sim)
+		cat.TryBerserk(sim)
+	}
 
 	if cat.customRotationAction == nil || sim.CurrentTime >= cat.customRotationAction.NextActionAt {
 		cat.OnGCDReady(sim)
