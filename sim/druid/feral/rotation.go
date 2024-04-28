@@ -3,7 +3,6 @@ package feral
 import (
 	"math"
 	"time"
-	"fmt"
 
 	"github.com/wowsims/cata/sim/core"
 	"github.com/wowsims/cata/sim/core/proto"
@@ -24,7 +23,6 @@ func (cat *FeralDruid) OnGCDReady(sim *core.Simulation) {
 	if cat.preRotationCleanup(sim) {
 		valid := false
 		nextAction := time.Duration(0)
-		fmt.Print("Test print")
 		if cat.Rotation.RotationType == proto.FeralDruid_Rotation_SingleTarget {
 			valid, nextAction = cat.doRotation(sim)
 		} else if cat.Rotation.RotationType == proto.FeralDruid_Rotation_TranzSpecial {
