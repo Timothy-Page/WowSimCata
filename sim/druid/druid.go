@@ -144,6 +144,8 @@ func (druid *Druid) AddRaidBuffs(raidBuffs *proto.RaidBuffs) {
 	if druid.InForm(Cat|Bear) && druid.Talents.LeaderOfThePack {
 		raidBuffs.LeaderOfThePack = true
 	}
+
+	raidBuffs.MarkOfTheWild = true
 }
 
 // func (druid *Druid) BalanceCritMultiplier() float64 {
@@ -278,6 +280,7 @@ func New(char *core.Character, form DruidForm, selfBuffs SelfBuffs, talents stri
 		StartingForm: form,
 		form:         form,
 	}
+
 	core.FillTalentsProto(druid.Talents.ProtoReflect(), talents, TalentTreeSizes)
 	druid.EnableManaBar()
 
