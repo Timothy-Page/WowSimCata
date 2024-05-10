@@ -1,5 +1,5 @@
 import * as PresetUtils from '../../core/preset_utils.js';
-import { Consumes, Debuffs, Flask, Food, Glyphs, Potions, Profession,RaidBuffs } from '../../core/proto/common.js';
+import { Consumes, Debuffs, Flask, Food, Glyphs, Potions, Profession,RaidBuffs, TinkerHands } from '../../core/proto/common.js';
 import {
 	AirTotem,
 	EarthTotem,
@@ -13,6 +13,8 @@ import {
 	ShamanSyncType,
 	ShamanTotems,
 	WaterTotem,
+	TotemSet,
+	CallTotem,
 } from '../../core/proto/shaman.js';
 import { SavedTalents } from '../../core/proto/ui.js';
 import DefaultApl from './apls/default.apl.json';
@@ -33,7 +35,7 @@ export const ROTATION_PRESET_DEFAULT = PresetUtils.makePresetAPLRotation('Defaul
 export const StandardTalents = {
 	name: 'Standard',
 	data: SavedTalents.create({
-		talentsString: '303202-2323320013003012321',
+		talentsString: '3022003-2333310013003012321',
 		glyphs: Glyphs.create({
 			prime1: ShamanPrimeGlyph.GlyphOfLavaLash,
 			prime2: ShamanPrimeGlyph.GlyphOfStormstrike,
@@ -51,11 +53,30 @@ export const StandardTalents = {
 export const DefaultOptions = EnhancementShamanOptions.create({
 	classOptions: {
 		shield: ShamanShield.LightningShield,
+		call: CallTotem.Elements,
 		totems: ShamanTotems.create({
-			earth: EarthTotem.StoneskinTotem,
+			elements: TotemSet.create({
+				earth: EarthTotem.StrengthOfEarthTotem,
+				air: AirTotem.WrathOfAirTotem,
+				fire: FireTotem.SearingTotem,
+				water: WaterTotem.ManaSpringTotem,
+			}),
+			ancestors: TotemSet.create({
+				earth: EarthTotem.StrengthOfEarthTotem,
+				air: AirTotem.WrathOfAirTotem,
+				fire: FireTotem.SearingTotem,
+				water: WaterTotem.ManaSpringTotem,
+			}),
+			spirits: TotemSet.create({
+				earth: EarthTotem.StrengthOfEarthTotem,
+				air: AirTotem.WrathOfAirTotem,
+				fire: FireTotem.SearingTotem,
+				water: WaterTotem.ManaSpringTotem,
+			}),
+			earth: EarthTotem.StrengthOfEarthTotem,
+			air: AirTotem.WrathOfAirTotem,
 			fire: FireTotem.SearingTotem,
-			water: WaterTotem.HealingStreamTotem,
-			air: AirTotem.WindfuryTotem,
+			water: WaterTotem.ManaSpringTotem,
 		}),
 		imbueMh: ShamanImbue.WindfuryWeapon,
 	},
@@ -74,6 +95,7 @@ export const DefaultConsumes = Consumes.create({
 	prepopPotion: Potions.PotionOfTheTolvir,
 	flask: Flask.FlaskOfTheWinds,
 	food: Food.FoodSeafoodFeast,
+	tinkerHands: TinkerHands.TinkerHandsSynapseSprings,
 });
 
 export const DefaultRaidBuffs = RaidBuffs.create({

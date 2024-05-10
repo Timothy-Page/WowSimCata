@@ -1,4 +1,4 @@
-import { Tooltip } from 'bootstrap';
+import tippy from 'tippy.js';
 
 import { BooleanPicker } from '../components/boolean_picker.js';
 import { NumberPicker } from '../components/number_picker.js';
@@ -18,7 +18,8 @@ import { ResultsViewer } from './results_viewer.js';
 
 export function addStatWeightsAction(simUI: IndividualSimUI<any>, epStats: Array<Stat>, epPseudoStats: Array<PseudoStat> | undefined, epReferenceStat: Stat) {
 	simUI.addAction('Stat Weights', 'ep-weights-action', () => {
-		new EpWeightsMenu(simUI, epStats, epPseudoStats || [], epReferenceStat);
+		// TODO: Make this so we can initialize the menu once outside of this function
+		new EpWeightsMenu(simUI, epStats, epPseudoStats || [], epReferenceStat).open();
 	});
 }
 
@@ -37,12 +38,12 @@ function scaledEpValue(stat: UnitStat, epRatios: number[], result: StatWeightsRe
 	if (!result) return 0;
 
 	return (
-		epRatios[0] * stat.getProtoValue(result.dps?.epValues!) +
-		epRatios[1] * stat.getProtoValue(result.hps?.epValues!) +
-		epRatios[2] * stat.getProtoValue(result.tps?.epValues!) +
-		epRatios[3] * stat.getProtoValue(result.dtps?.epValues!) +
-		epRatios[4] * stat.getProtoValue(result.tmi?.epValues!) +
-		epRatios[5] * stat.getProtoValue(result.pDeath?.epValues!)
+		(result.dps?.epValues ? epRatios[0] * stat.getProtoValue(result.dps.epValues) : 0) +
+		(result.hps?.epValues ? epRatios[1] * stat.getProtoValue(result.hps.epValues) : 0) +
+		(result.tps?.epValues ? epRatios[2] * stat.getProtoValue(result.tps.epValues) : 0) +
+		(result.dtps?.epValues ? epRatios[3] * stat.getProtoValue(result.dtps.epValues) : 0) +
+		(result.tmi?.epValues ? epRatios[4] * stat.getProtoValue(result.tmi.epValues) : 0) +
+		(result.pDeath?.epValues ? epRatios[5] * stat.getProtoValue(result.pDeath.epValues) : 0)
 	);
 }
 
@@ -60,7 +61,7 @@ class EpWeightsMenu extends BaseModal {
 	private showAllStats = false;
 
 	constructor(simUI: IndividualSimUI<any>, epStats: Array<Stat>, epPseudoStats: Array<PseudoStat>, epReferenceStat: Stat) {
-		super(simUI.rootElem, 'ep-weights-menu', getModalConfig(simUI));
+		super(simUI.rootElem, 'ep-weights-menu', { ...getModalConfig(simUI), disposeOnClose: false });
 		this.simUI = simUI;
 		this.statsType = 'ep';
 		this.epStats = epStats;
@@ -277,24 +278,24 @@ class EpWeightsMenu extends BaseModal {
 		};
 
 		const epRefSelects = this.rootElem.querySelectorAll('.ref-stat-select') as NodeListOf<HTMLSelectElement>;
-		epRefSelects.forEach((epSelect: HTMLSelectElement, idx: number) => {
+		epRefSelects.forEach((epSelect: HTMLSelectElement) => {
 			this.epStats.forEach(stat => {
 				epSelect.options[epSelect.options.length] = new Option(getNameFromStat(stat));
 			});
 			if (epSelect.classList.contains('damage-metrics')) {
-				epSelect.addEventListener('input', event => {
+				epSelect.addEventListener('input', () => {
 					this.simUI.dpsRefStat = getStatFromName(epSelect.value);
 					updateEpRefStat();
 				});
 				epSelect.value = getNameFromStat(this.getDpsEpRefStat());
 			} else if (epSelect.classList.contains('healing-metrics')) {
-				epSelect.addEventListener('input', event => {
+				epSelect.addEventListener('input', () => {
 					this.simUI.healRefStat = getStatFromName(epSelect.value);
 					updateEpRefStat();
 				});
 				epSelect.value = getNameFromStat(this.getHealEpRefStat());
 			} else if (epSelect.classList.contains('threat-metrics')) {
-				epSelect.addEventListener('input', event => {
+				epSelect.addEventListener('input', () => {
 					this.simUI.tankRefStat = getStatFromName(epSelect.value);
 					updateEpRefStat();
 				});
@@ -303,13 +304,12 @@ class EpWeightsMenu extends BaseModal {
 		});
 
 		const optimizeGemsButton = this.rootElem.getElementsByClassName('optimize-gems')[0] as HTMLElement;
-		Tooltip.getOrCreateInstance(optimizeGemsButton, {
-			html: true,
-			title: `<p><span class='warning link-warning'><i class='fa fa-exclamation-triangle'></i> WARNING</span> This feature is experimental, and will not always produce the most optimal gems especially when interacting with soft/hard stat caps.</p>
+		tippy(optimizeGemsButton, {
+			content: `<p><span class='warning link-warning'><i class='fa fa-exclamation-triangle'></i> WARNING</span> This feature is experimental, and will not always produce the most optimal gems especially when interacting with soft/hard stat caps.</p>
 			<p>Optimizes equipped gems to maximize EP, based on the values in <b>Current EP</b>.</p>
 			<p class='mb-0'>Does not change the meta gem, but ensures that its condition is met. Uses JC gems if Jewelcrafting is a selected profession.</p>`,
 		});
-		optimizeGemsButton.addEventListener('click', async event => {
+		optimizeGemsButton.addEventListener('click', async () => {
 			const previousContents = optimizeGemsButton.innerHTML;
 			optimizeGemsButton.classList.add('disabled');
 			optimizeGemsButton.style.width = `${optimizeGemsButton.getBoundingClientRect().width.toFixed(3)}px`;
@@ -319,8 +319,8 @@ class EpWeightsMenu extends BaseModal {
 			optimizeGemsButton.classList.remove('disabled');
 		});
 
-		const calcButton = this.rootElem.getElementsByClassName('calc-weights')[0] as HTMLElement;
-		calcButton.addEventListener('click', async event => {
+		const calcButton = this.rootElem.querySelector<HTMLElement>('.calc-weights')!;
+		calcButton.addEventListener('click', async () => {
 			const previousContents = calcButton.innerHTML;
 			calcButton.classList.add('disabled');
 			calcButton.style.width = `${calcButton.getBoundingClientRect().width.toFixed(3)}px`;
@@ -342,6 +342,7 @@ class EpWeightsMenu extends BaseModal {
 			this.resultsViewer.hideAll();
 			calcButton.innerHTML = previousContents;
 			calcButton.classList.remove('disabled');
+			if (!result) return;
 			this.simUI.prevEpIterations = iterations;
 			this.simUI.prevEpSimResult = this.calculateEp(result);
 			this.updateTable();
@@ -360,21 +361,17 @@ class EpWeightsMenu extends BaseModal {
 				if (!epRefStat) return labelTooltip;
 
 				const refStatName = getNameFromStat(epRefStat());
-				return labelTooltip + ` Normalized by ${refStatName}.`;
-			};
-			const labelTooltipConfig = {
-				toggle: 'tooltip',
-				html: true,
-				title: title,
+				return `${labelTooltip} Normalized by ${refStatName}.`;
 			};
 
-			new Tooltip(label, labelTooltipConfig);
-			Tooltip.getOrCreateInstance(button, {
-				title: tooltip,
-				html: true,
+			tippy(label, {
+				content: title,
+			});
+			tippy(button, {
+				content: tooltip,
 			});
 
-			button.addEventListener('click', event => {
+			button.addEventListener('click', () => {
 				this.simUI.player.setEpWeights(TypedEvent.nextEventID(), Stats.fromProto(weightsFunc()));
 				this.updateTable();
 			});
@@ -468,7 +465,7 @@ class EpWeightsMenu extends BaseModal {
 			inline: true,
 			changedEvent: () => new TypedEvent(),
 			getValue: () => this.showAllStats,
-			setValue: (eventID: EventID, menu: EpWeightsMenu, newValue: boolean) => {
+			setValue: (_eventID: EventID, _menu: EpWeightsMenu, newValue: boolean) => {
 				this.showAllStats = newValue;
 				this.updateTable();
 			},
@@ -479,8 +476,8 @@ class EpWeightsMenu extends BaseModal {
 		const makeEpRatioCell = (cell: HTMLElement, idx: number) => {
 			new NumberPicker(cell, this.simUI.player, {
 				float: true,
-				changedEvent: (player: Player<any>) => player.epRatiosChangeEmitter,
-				getValue: (player: Player<any>) => this.simUI.player.getEpRatios()[idx],
+				changedEvent: player => player.epRatiosChangeEmitter,
+				getValue: () => this.simUI.player.getEpRatios()[idx],
 				setValue: (eventID: EventID, player: Player<any>, newValue: number) => {
 					const epRatios = player.getEpRatios();
 					epRatios[idx] = newValue;
@@ -496,11 +493,11 @@ class EpWeightsMenu extends BaseModal {
 		weightRatioCells.forEach(makeEpRatioCell);
 
 		const updateButton = this.rootElem.getElementsByClassName('compute-ep')[0] as HTMLElement;
-		Tooltip.getOrCreateInstance(updateButton, {
-			title: 'Compute Weighted EP',
+		tippy(updateButton, {
+			content: 'Compute Weighted EP',
 		});
 
-		updateButton.addEventListener('click', event => {
+		updateButton.addEventListener('click', () => {
 			const results = this.getPrevSimResult();
 			const epRatios = this.simUI.player.getEpRatios();
 			if (this.statsType == 'ep') {
@@ -578,7 +575,7 @@ class EpWeightsMenu extends BaseModal {
 		new NumberPicker(currentEpCell, this.simUI.player, {
 			float: true,
 			changedEvent: (player: Player<any>) => player.epWeightsChangeEmitter,
-			getValue: (player: Player<any>) => this.simUI.player.getEpWeights().getUnitStat(stat),
+			getValue: () => this.simUI.player.getEpWeights().getUnitStat(stat),
 			setValue: (eventID: EventID, player: Player<any>, newValue: number) => {
 				const epWeights = player.getEpWeights().withUnitStat(stat, newValue);
 				player.setEpWeights(eventID, epWeights);

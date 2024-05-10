@@ -13,6 +13,7 @@ import {
 } from '../proto/common.js';
 import { GlyphID, IconData, UIDatabase, UIEnchant as Enchant, UIGem as Gem, UIItem as Item, UINPC as Npc, UIZone as Zone } from '../proto/ui.js';
 import { distinct } from '../utils.js';
+import { WOWHEAD_EXPANSION_ENV } from '../wowhead';
 import { EquippedItem } from './equipped_item.js';
 import { Gear, ItemSwapGear } from './gear.js';
 import { gemEligibleForSocket, gemMatchesSocket } from './gems.js';
@@ -153,12 +154,12 @@ export class Database {
 		return this.randomSuffixes.get(id);
 	}
 
-	getReforge(id: number): ReforgeStat | undefined {
+	getReforgeById(id: number): ReforgeStat | undefined {
 		return this.reforgeStats.get(id);
 	}
 
-	getAvailableReforges(item: Item): ReforgeStat[] | undefined {
-		const availableReforges = Array.from(this.reforgeStats.values()).filter(reforgeStat => {
+	getAvailableReforges(item: Item): ReforgeStat[] {
+		return Array.from(this.reforgeStats.values()).filter(reforgeStat => {
 			for (let i = 0; i < reforgeStat.fromStat.length; i++) {
 				const statIndex = reforgeStat.fromStat[i];
 				if (item.stats[statIndex] > 0 && item.stats[reforgeStat.toStat[0]] <= 0) {
@@ -167,8 +168,6 @@ export class Database {
 			}
 			return false;
 		});
-
-		return availableReforges.length > 0 ? availableReforges : undefined;
 	}
 
 	getEnchants(slot: ItemSlot): Array<Enchant> {
@@ -228,7 +227,12 @@ export class Database {
 			randomSuffix = this.getRandomSuffixById(itemSpec.randomSuffix)!;
 		}
 
-		return new EquippedItem(item, enchant, gems, randomSuffix, itemSpec.reforging);
+		let reforge: ReforgeStat | null = null;
+		if (itemSpec.reforging) {
+			reforge = this.getReforgeById(itemSpec.reforging) || null;
+		}
+
+		return new EquippedItem(item, enchant, gems, randomSuffix, reforge);
 	}
 
 	lookupEquipmentSpec(equipSpec: EquipmentSpec): Gear {
@@ -308,7 +312,7 @@ export class Database {
 		return Database.getWowheadTooltipData(id, 'spell');
 	}
 	private static async getWowheadTooltipData(id: number, tooltipPostfix: string): Promise<IconData> {
-		const url = `https://nether.wowhead.com/cata/tooltip/${tooltipPostfix}/${id}?lvl=${CHARACTER_LEVEL}&dataEnv=11`;
+		const url = `https://nether.wowhead.com/cata/tooltip/${tooltipPostfix}/${id}?lvl=${CHARACTER_LEVEL}&dataEnv=${WOWHEAD_EXPANSION_ENV}`;
 		try {
 			const response = await fetch(url);
 			const json = await response.json();
@@ -316,6 +320,7 @@ export class Database {
 				id: id,
 				name: json['name'],
 				icon: json['icon'],
+				hasBuff: json['buff'] !== '',
 			});
 		} catch (e) {
 			console.error('Error while fetching url: ' + url + '\n\n' + e);

@@ -3,7 +3,6 @@ package stats
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/wowsims/cata/sim/core/proto"
 )
@@ -39,7 +38,6 @@ const (
 	RangedAttackPower
 	Defense
 	Block
-	BlockValue
 	Dodge
 	Parry
 	Resilience
@@ -137,8 +135,6 @@ func (s Stat) StatName() string {
 		return "Defense"
 	case Block:
 		return "Block"
-	case BlockValue:
-		return "BlockValue"
 	case Dodge:
 		return "Dodge"
 	case Parry:
@@ -280,8 +276,7 @@ type PseudoStats struct {
 	MeleeSpeedMultiplier  float64
 	RangedSpeedMultiplier float64
 
-	FiveSecondRuleRefreshTime time.Duration // last time a spell was cast
-	SpiritRegenRateCasting    float64       // percentage of spirit regen allowed during casting
+	SpiritRegenRateCombat float64 // percentage of spirit regen allowed during combat
 
 	// Both of these are currently only used for innervate.
 	ForceFullSpiritRegen  bool    // If set, automatically uses full spirit regen regardless of FSR refresh time.
@@ -312,7 +307,7 @@ type PseudoStats struct {
 	DotDamageMultiplierAdditive float64            // All periodic damage
 
 	// Important when unit is attacker or target
-	BlockValueMultiplier float64
+	BlockDamageReduction float64
 
 	// Only used for NPCs, governs variance in enemy auto-attack damage
 	DamageSpread float64
@@ -358,7 +353,8 @@ type PseudoStats struct {
 	ReducedNatureHitTakenChance   float64
 	ReducedShadowHitTakenChance   float64
 
-	HealingTakenMultiplier float64
+	HealingTakenMultiplier  float64
+	MovementSpeedMultiplier float64 // Multiplier for movement speed, default to 1. Player base movement 7 yards/s. All effects affecting movements are multipliers.
 }
 
 func NewPseudoStats() PseudoStats {
@@ -376,7 +372,7 @@ func NewPseudoStats() PseudoStats {
 		SchoolDamageDealtMultiplier: NewSchoolFloatArray(),
 		DotDamageMultiplierAdditive: 1,
 
-		BlockValueMultiplier: 1,
+		BlockDamageReduction: 0.3,
 
 		DamageSpread: 0.3333,
 
@@ -389,7 +385,8 @@ func NewPseudoStats() PseudoStats {
 
 		ArmorMultiplier: 1,
 
-		HealingTakenMultiplier: 1,
+		HealingTakenMultiplier:  1,
+		MovementSpeedMultiplier: 1,
 	}
 }
 

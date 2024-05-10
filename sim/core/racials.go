@@ -82,7 +82,7 @@ func applyRaceEffects(agent Agent) {
 			character.AddBonusRangedCritRating(1 * CritRatingPerCritChance)
 		}
 
-		applyWeaponSpecialization(character, 5*ExpertisePerQuarterPercentReduction,
+		applyWeaponSpecialization(character, 3*ExpertisePerQuarterPercentReduction,
 			proto.WeaponType_WeaponTypeMace)
 
 		actionID := ActionID{SpellID: 20594}
@@ -138,11 +138,13 @@ func applyRaceEffects(agent Agent) {
 		spBonus := 0.0
 
 		switch character.Class {
+		case proto.Class_ClassMage:
+			spBonus = 584.5
 		case proto.Class_ClassWarlock:
-			spBonus = 584.0
+			spBonus = 584.5
 		case proto.Class_ClassShaman:
-			spBonus = 584.0
-			apBonus = 1196.0
+			spBonus = 584.5
+			apBonus = 1169.0
 		default:
 			apBonus = 1169.0
 		}
@@ -168,7 +170,7 @@ func applyRaceEffects(agent Agent) {
 		})
 
 		// Axe specialization
-		applyWeaponSpecialization(character, 5*ExpertisePerQuarterPercentReduction,
+		applyWeaponSpecialization(character, 3*ExpertisePerQuarterPercentReduction,
 			proto.WeaponType_WeaponTypeAxe, proto.WeaponType_WeaponTypeFist)
 	case proto.Race_RaceTauren:
 		character.PseudoStats.ReducedNatureHitTakenChance += 0.02

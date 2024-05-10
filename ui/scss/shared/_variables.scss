@@ -118,6 +118,7 @@ $icon-size-md: 2.5rem;
 // Z-index variables
 $header-z-index: 100;
 $sidebar-z-index: 200;
+$toast-z-index: 9999;
 
 /////////////////////////////////////////////
 //// Global Bootstrap variable overrides ////
@@ -198,7 +199,7 @@ $input-font-size: $content-font-size;
 $input-placeholder-color: $link-color;
 
 $modal-content-bg: $body-bg;
-$modal-content-border-color: $link-color;
+$modal-content-border-color: $border-color;
 $modal-footer-margin-between: 0px;
 $modal-header-border-color: $border-color;
 $modal-header-padding: 1.25rem;
@@ -217,13 +218,11 @@ $nav-tabs-border-color: $border-color;
 $nav-tabs-link-active-bg: transparent;
 $nav-tabs-link-active-color: white;
 
-$popover-bg: #424557;
-$popover-body-color: white;
-$popover-body-padding-x: map-get($spacers, 2);
-$popover-body-padding-y: map-get($spacers, 2);
-
-$tooltip-bg: $popover-bg;
-$tooltip-color: white;
+$tooltip-bg: #424557;
+$tooltip-border: $link-color;
+$tooltip-body-color: white;
 $tooltip-max-width: 15vw;
 $tooltip-max-width-lg: 25vw;
 $tooltip-max-width-sm: 75vw;
+$tooltip-body-padding-x: map-get($spacers, 2);
+$tooltip-body-padding-y: map-get($spacers, 2);

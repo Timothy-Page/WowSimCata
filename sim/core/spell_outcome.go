@@ -366,7 +366,7 @@ func (spell *Spell) OutcomeEnemyMeleeWhite(sim *Simulation, result *SpellResult,
 	if !result.applyEnemyAttackTableMiss(spell, attackTable, roll, &chance) &&
 		!result.applyEnemyAttackTableDodge(spell, attackTable, roll, &chance) &&
 		!result.applyEnemyAttackTableParry(spell, attackTable, roll, &chance) &&
-		!result.applyEnemyAttackTableBlock(spell, attackTable, roll, &chance) &&
+		!result.applyEnemyAttackTableBlock(sim, spell, attackTable, roll, &chance) &&
 		!result.applyEnemyAttackTableCrit(spell, attackTable, roll, &chance) {
 		result.applyAttackTableHit(spell)
 	}
@@ -376,12 +376,18 @@ func (spell *Spell) fixedCritCheck(sim *Simulation, critChance float64) bool {
 	return sim.RandomFloat("Fixed Crit Roll") < critChance
 }
 
-func (result *SpellResult) applyAttackTableMiss(spell *Spell, attackTable *AttackTable, roll float64, chance *float64) bool {
+func (spell *Spell) GetPhysicalMissChance(attackTable *AttackTable) float64 {
 	missChance := attackTable.BaseMissChance - spell.PhysicalHitChance(attackTable)
+
 	if spell.Unit.AutoAttacks.IsDualWielding && !spell.Unit.PseudoStats.DisableDWMissPenalty {
 		missChance += 0.19
 	}
-	*chance = max(0, missChance)
+
+	return max(0, missChance)
+}
+
+func (result *SpellResult) applyAttackTableMiss(spell *Spell, attackTable *AttackTable, roll float64, chance *float64) bool {
+	*chance = spell.GetPhysicalMissChance(attackTable)
 
 	if roll < *chance {
 		result.Outcome = OutcomeMiss
@@ -411,7 +417,9 @@ func (result *SpellResult) applyAttackTableBlock(spell *Spell, attackTable *Atta
 	if roll < *chance {
 		result.Outcome |= OutcomeBlock
 		spell.SpellMetrics[result.Target.UnitIndex].Blocks++
-		result.Damage = max(0, result.Damage-result.Target.BlockValue())
+		damageReduced := result.Damage * (1 - result.Target.BlockDamageReduction())
+		result.Damage = max(0, damageReduced)
+
 		return true
 	}
 	return false
@@ -519,7 +527,7 @@ func (result *SpellResult) applyEnemyAttackTableMiss(spell *Spell, attackTable *
 	return false
 }
 
-func (result *SpellResult) applyEnemyAttackTableBlock(spell *Spell, attackTable *AttackTable, roll float64, chance *float64) bool {
+func (result *SpellResult) applyEnemyAttackTableBlock(sim *Simulation, spell *Spell, attackTable *AttackTable, roll float64, chance *float64) bool {
 	if !result.Target.PseudoStats.CanBlock || result.Target.PseudoStats.Stunned {
 		return false
 	}
@@ -529,7 +537,14 @@ func (result *SpellResult) applyEnemyAttackTableBlock(spell *Spell, attackTable 
 	if roll < *chance {
 		result.Outcome |= OutcomeBlock
 		spell.SpellMetrics[result.Target.UnitIndex].Blocks++
-		result.Damage = max(0, result.Damage-result.Target.BlockValue())
+
+		if result.Target.Blockhandler != nil {
+			result.Target.Blockhandler(sim, spell, result)
+			return true
+		}
+
+		result.Damage = max(0, result.Damage*(1-result.Target.BlockDamageReduction()))
+
 		return true
 	}
 	return false
@@ -620,6 +635,29 @@ func (spell *Spell) OutcomeExpectedMagicHitAndCrit(_ *Simulation, result *SpellR
 	averageMultiplier -= spell.SpellChanceToMiss(attackTable)
 	averageMultiplier += averageMultiplier * spell.SpellCritChance(result.Target) * (spell.CritMultiplier - 1)
 
+	result.Damage *= averageMultiplier
+}
+
+func (spell *Spell) OutcomeExpectedMeleeWhite(_ *Simulation, result *SpellResult, attackTable *AttackTable) {
+	missChance := spell.GetPhysicalMissChance(attackTable)
+	dodgeChance := TernaryFloat64(spell.Flags.Matches(SpellFlagCannotBeDodged), 0, max(0, attackTable.BaseDodgeChance-spell.ExpertisePercentage()-spell.Unit.PseudoStats.DodgeReduction))
+	parryChance := TernaryFloat64(spell.Unit.PseudoStats.InFrontOfTarget, max(0, attackTable.BaseParryChance-spell.ExpertisePercentage()), 0)
+	glanceChance := attackTable.BaseGlanceChance
+	blockChance := TernaryFloat64(spell.Unit.PseudoStats.InFrontOfTarget, attackTable.BaseBlockChance, 0)
+	whiteCritCap := 1.0 - missChance - dodgeChance - parryChance - glanceChance - blockChance
+	critChance := min(spell.PhysicalCritChance(attackTable), whiteCritCap)
+	averageMultiplier := 1.0 - missChance - dodgeChance - parryChance + (spell.CritMultiplier-1)*critChance - glanceChance*(1.0-attackTable.GlanceMultiplier) - blockChance*result.Target.BlockDamageReduction()
+	result.Damage *= averageMultiplier
+}
+
+func (spell *Spell) OutcomeExpectedMeleeWeaponSpecialHitAndCrit(_ *Simulation, result *SpellResult, attackTable *AttackTable) {
+	missChance := max(0, attackTable.BaseMissChance-spell.PhysicalHitChance(attackTable))
+	dodgeChance := TernaryFloat64(spell.Flags.Matches(SpellFlagCannotBeDodged), 0, max(0, attackTable.BaseDodgeChance-spell.ExpertisePercentage()-spell.Unit.PseudoStats.DodgeReduction))
+	parryChance := TernaryFloat64(spell.Unit.PseudoStats.InFrontOfTarget, max(0, attackTable.BaseParryChance-spell.ExpertisePercentage()), 0)
+	blockChance := TernaryFloat64(spell.Unit.PseudoStats.InFrontOfTarget, attackTable.BaseBlockChance, 0)
+	critChance := spell.PhysicalCritChance(attackTable)
+	averageMultiplier := (1.0 - missChance - dodgeChance - parryChance) * (1.0 + (spell.CritMultiplier-1)*critChance)
+	averageMultiplier -= blockChance * ((spell.CritMultiplier-1)*critChance + result.Target.BlockDamageReduction())
 	result.Damage *= averageMultiplier
 }
 

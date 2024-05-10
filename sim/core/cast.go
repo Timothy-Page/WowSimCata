@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"math"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type Hardcast struct {
 	ActionID   ActionID
 	OnComplete func(*Simulation, *Unit)
 	Target     *Unit
+	CanMove    bool
 }
 
 // Input for constructing the CastSpell function for a spell.
@@ -44,6 +46,9 @@ type Cast struct {
 	// The length of time the GCD will be on CD as a result of this cast.
 	GCD time.Duration
 
+	// The minimum length of time for the GCD. Can be left out to use the default of 1s
+	GCDMin time.Duration
+
 	// The amount of time between the call to spell.Cast() and when the spell
 	// effects are invoked.
 	CastTime time.Duration
@@ -55,8 +60,11 @@ type Cast struct {
 func (cast *Cast) EffectiveTime() time.Duration {
 	gcd := max(0, cast.GCD)
 	if cast.GCD > 0 {
-		// TODO: isn't this wrong for spells like shadowfury, that have a reduced GCD?
-		gcd = max(GCDMin, gcd)
+		if cast.GCDMin != 0 {
+			gcd = max(cast.GCDMin, gcd)
+		} else {
+			gcd = max(GCDMin, gcd)
+		}
 	}
 	return max(gcd, cast.CastTime)
 }
@@ -136,6 +144,10 @@ func (spell *Spell) makeCastFunc(config CastConfig) CastSuccessFunc {
 			spell.Unit.SetGCDTimer(sim, sim.CurrentTime+effectiveTime)
 		}
 
+		if (spell.Flags&SpellFlagCanCastWhileMoving == 0) && (spell.CurCast.CastTime > 0) && spell.Unit.Moving {
+			return spell.castFailureHelper(sim, "casting/channeling while moving not allowed!")
+		}
+
 		// Hardcasts
 		if spell.CurCast.CastTime > 0 {
 			if sim.Log != nil && !spell.Flags.Matches(SpellFlagNoLogs) {
@@ -161,13 +173,11 @@ func (spell *Spell) makeCastFunc(config CastConfig) CastSuccessFunc {
 						spell.Unit.OnCastComplete(sim, spell)
 					}
 				},
-				Target: target,
+				Target:  target,
+				CanMove: spell.Flags&SpellFlagCanCastWhileMoving > 0,
 			}
 
-			if spell.Unit.Hardcast.Expires != spell.Unit.NextGCDAt() {
-				spell.Unit.newHardcastAction(sim)
-			}
-
+			spell.Unit.newHardcastAction(sim)
 			return true
 		}
 
@@ -253,6 +263,6 @@ func (spell *Spell) makeCastFuncAutosOrProcs() CastSuccessFunc {
 
 func (spell *Spell) ApplyCostModifiers(cost float64) float64 {
 	cost -= spell.Unit.PseudoStats.CostReduction
-	cost = max(0, cost*spell.Unit.PseudoStats.CostMultiplier)
-	return max(0, cost*spell.CostMultiplier)
+	cost = max(0, math.Floor(cost*spell.Unit.PseudoStats.CostMultiplier))
+	return max(0, math.Floor(cost*spell.CostMultiplier))
 }

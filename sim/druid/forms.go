@@ -55,6 +55,7 @@ func (druid *Druid) GetCatWeapon() core.Weapon {
 		NormalizedSwingSpeed: 1.0,
 		CritMultiplier:       druid.DefaultMeleeCritMultiplier(),
 		AttackPowerPerDPS:    core.DefaultAttackPowerPerDPS,
+		MaxRange:             core.MaxMeleeRange,
 	}
 }
 
@@ -67,13 +68,14 @@ func (druid *Druid) GetBearWeapon() core.Weapon {
 		NormalizedSwingSpeed: 2.5,
 		CritMultiplier:       druid.DefaultMeleeCritMultiplier(),
 		AttackPowerPerDPS:    core.DefaultAttackPowerPerDPS,
+		MaxRange:             core.MaxMeleeRange,
 	}
 }
 
 func (druid *Druid) registerCatFormSpell() {
 	actionID := core.ActionID{SpellID: 768}
 
-	srm := druid.getSavageRoarMultiplier()
+	srm := druid.GetSavageRoarMultiplier()
 
 	statBonus := stats.Stats{
 		stats.AttackPower: -20, // This offset is needed because the first 10 points of Agility do not contribute any Attack Power.
@@ -111,6 +113,7 @@ func (druid *Druid) registerCatFormSpell() {
 			druid.PseudoStats.ThreatMultiplier *= 0.71
 			druid.PseudoStats.SpiritRegenMultiplier *= AnimalSpiritRegenSuppression
 			druid.PseudoStats.BaseDodge += 0.02 * float64(druid.Talents.FeralSwiftness)
+			druid.PseudoStats.MovementSpeedMultiplier *= 1.0 + 0.15 * float64(druid.Talents.FeralSwiftness)
 
 			druid.AddStatsDynamic(sim, statBonus)
 			druid.EnableDynamicStatDep(sim, agiApDep)
@@ -144,6 +147,7 @@ func (druid *Druid) registerCatFormSpell() {
 			druid.PseudoStats.ThreatMultiplier /= 0.71
 			druid.PseudoStats.SpiritRegenMultiplier /= AnimalSpiritRegenSuppression
 			druid.PseudoStats.BaseDodge -= 0.02 * float64(druid.Talents.FeralSwiftness)
+			druid.PseudoStats.MovementSpeedMultiplier /= 1.0 + 0.15 * float64(druid.Talents.FeralSwiftness)
 
 			druid.AddStatsDynamic(sim, statBonus.Invert())
 			druid.DisableDynamicStatDep(sim, agiApDep)
@@ -168,6 +172,10 @@ func (druid *Druid) registerCatFormSpell() {
 
 				if druid.PredatoryInstinctsAura != nil {
 					druid.PredatoryInstinctsAura.Deactivate(sim)
+				}
+
+				if druid.StrengthOfThePantherAura.IsActive() {
+					druid.StrengthOfThePantherAura.Deactivate(sim)
 				}
 			}
 		},
@@ -204,7 +212,7 @@ func (druid *Druid) registerCatFormSpell() {
 }
 
 func (druid *Druid) registerBearFormSpell() {
-	actionID := core.ActionID{SpellID: 9634}
+	actionID := core.ActionID{SpellID: 5487}
 	healthMetrics := druid.NewHealthMetrics(actionID)
 
 	statBonus := stats.Stats{
@@ -242,7 +250,7 @@ func (druid *Druid) registerBearFormSpell() {
 
 			druid.AutoAttacks.SetMH(clawWeapon)
 
-			druid.PseudoStats.ThreatMultiplier *= 2.1021
+			druid.PseudoStats.ThreatMultiplier *= 5
 			druid.PseudoStats.SchoolDamageDealtMultiplier[stats.SchoolIndexPhysical] *= core.TernaryFloat64(druid.Talents.MasterShapeshifter, 1.04, 1.0)
 			druid.PseudoStats.DamageTakenMultiplier *= nrdtm
 			druid.PseudoStats.SpiritRegenMultiplier *= AnimalSpiritRegenSuppression
@@ -264,7 +272,6 @@ func (druid *Druid) registerBearFormSpell() {
 			druid.GainHealth(sim, healthFrac*druid.MaxHealth()-druid.CurrentHealth(), healthMetrics)
 
 			if !druid.Env.MeasuringStats {
-				druid.AutoAttacks.SetReplaceMHSwing(druid.ReplaceBearMHFunc)
 				druid.AutoAttacks.EnableAutoSwing(sim)
 
 				druid.UpdateManaRegenRates()
@@ -274,7 +281,7 @@ func (druid *Druid) registerBearFormSpell() {
 			druid.form = Humanoid
 			druid.AutoAttacks.SetMH(druid.WeaponFromMainHand(druid.DefaultMeleeCritMultiplier()))
 
-			druid.PseudoStats.ThreatMultiplier /= 2.1021
+			druid.PseudoStats.ThreatMultiplier /= 5
 			druid.PseudoStats.SchoolDamageDealtMultiplier[stats.SchoolIndexPhysical] /= core.TernaryFloat64(druid.Talents.MasterShapeshifter, 1.04, 1.0)
 			druid.PseudoStats.DamageTakenMultiplier /= nrdtm
 			druid.PseudoStats.SpiritRegenMultiplier /= AnimalSpiritRegenSuppression
@@ -295,13 +302,13 @@ func (druid *Druid) registerBearFormSpell() {
 			druid.RemoveHealth(sim, druid.CurrentHealth()-healthFrac*druid.MaxHealth())
 
 			if !druid.Env.MeasuringStats {
-				druid.AutoAttacks.SetReplaceMHSwing(nil)
 				druid.AutoAttacks.EnableAutoSwing(sim)
-
 				druid.UpdateManaRegenRates()
 				druid.EnrageAura.Deactivate(sim)
-				druid.MaulQueueAura.Deactivate(sim)
-				druid.PulverizeAura.Deactivate(sim)
+
+				if druid.PulverizeAura.IsActive() {
+					druid.PulverizeAura.Deactivate(sim)
+				}
 			}
 		},
 	})

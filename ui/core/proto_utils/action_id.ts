@@ -1,8 +1,9 @@
 import { getWowheadLanguagePrefix } from '../constants/lang.js';
 import { CHARACTER_LEVEL } from '../constants/mechanics.js';
 import { ResourceType } from '../proto/api.js';
-import { ActionID as ActionIdProto, ItemRandomSuffix, OtherAction } from '../proto/common.js';
+import { ActionID as ActionIdProto, ItemRandomSuffix, OtherAction, ReforgeStat } from '../proto/common.js';
 import { IconData, UIItem as Item } from '../proto/ui.js';
+import { buildWowheadTooltipDataset, WowheadTooltipItemParams, WowheadTooltipSpellParams } from '../wowhead';
 import { Database } from './database.js';
 
 // If true uses wotlkdb.com, else uses wowhead.com.
@@ -47,9 +48,9 @@ export class ActionId {
 				name = 'Mana Tick';
 				iconUrl = resourceTypeToIcon[ResourceType.ResourceTypeMana];
 				if (tag == 1) {
-					name += ' (Casting)';
+					name += ' (In Combat)';
 				} else if (tag == 2) {
-					name += ' (Not Casting)';
+					name += ' (Out of Combat)';
 				}
 				break;
 			case OtherAction.OtherActionEnergyRegen:
@@ -115,6 +116,10 @@ export class ActionId {
 				baseName = 'Potion';
 				iconUrl = 'https://wow.zamimg.com/images/wow/icons/large/inv_alchemy_elixir_04.jpg';
 				break;
+			case OtherAction.OtherActionMove:
+				baseName = 'Moving';
+				iconUrl = 'https://wow.zamimg.com/images/wow/icons/medium/inv_boots_cloth_03.jpg';
+				break;
 		}
 		this.baseName = baseName;
 		this.name = name || baseName;
@@ -146,10 +151,16 @@ export class ActionId {
 	static makeSpellUrl(id: number): string {
 		const langPrefix = getWowheadLanguagePrefix();
 		if (USE_WOTLK_DB) {
-			return 'https://wotlkdb.com/?spell=' + id;
+			return `https://wotlkdb.com/?spell=${id}`;
 		} else {
 			return `https://wowhead.com/cata/${langPrefix}spell=${id}`;
 		}
+	}
+	static async makeItemTooltipData(id: number, params?: Omit<WowheadTooltipItemParams, 'itemId'>) {
+		return buildWowheadTooltipDataset({ itemId: id, ...params });
+	}
+	static async makeSpellTooltipData(id: number, params?: Omit<WowheadTooltipSpellParams, 'spellId'>) {
+		return buildWowheadTooltipDataset({ spellId: id, ...params });
 	}
 	static makeQuestUrl(id: number): string {
 		const langPrefix = getWowheadLanguagePrefix();
@@ -182,6 +193,12 @@ export class ActionId {
 		} else if (this.spellId) {
 			elem.href = ActionId.makeSpellUrl(this.spellId);
 		}
+	}
+
+	async setWowheadDataset(elem: HTMLElement, params?: Omit<WowheadTooltipItemParams, 'itemId'> | Omit<WowheadTooltipSpellParams, 'spellId'>) {
+		(this.itemId ? ActionId.makeItemTooltipData(this.itemId, params) : ActionId.makeSpellTooltipData(this.spellId, params)).then(url => {
+			if (elem) elem.dataset.wowhead = url;
+		});
 	}
 
 	setBackgroundAndHref(elem: HTMLAnchorElement) {
@@ -249,10 +266,12 @@ export class ActionId {
 				}
 				break;
 			case 'Pyroblast':
+			case 'Combustion':
 				if (this.tag) name += ' (DoT)';
 				break;
 			case 'Living Bomb':
-				if (this.spellId == 55362) name += ' (Explosion)';
+				if (this.tag == 1) name += ' (DoT)';
+				else if (this.tag == 2) name += ' (Explosion)';
 				break;
 			case 'Evocation':
 				if (this.tag == 1) {
@@ -335,6 +354,15 @@ export class ActionId {
 					name += ' (DoT)';
 				}
 				break;
+			case 'Stormstrike':
+				if (this.tag == 0) {
+					name += ' (Cast)';
+				} else if (this.tag == 1) {
+					name += ' (Main Hand)';
+				} else if (this.tag == 2) {
+					name += ' (Off Hand)';
+				}
+				break;
 			case 'Chain Lightning':
 			case 'Lightning Bolt':
 			case 'Lava Burst':
@@ -346,7 +374,15 @@ export class ActionId {
 				break;
 			case 'Flame Shock':
 				if (this.tag == 1) {
-					name += ' (DoT)'
+					name += ' (DoT)';
+				}
+				break;
+			case 'Fulmination':
+				name += ` (${this.tag + 3})`;
+			case 'Moonfire':
+			case 'Sunfire':
+				if (this.tag == 1) {
+					name += ' (DoT)';
 				}
 				break;
 			case 'Holy Shield':
@@ -489,6 +525,11 @@ export class ActionId {
 					name += ' (pre)';
 				}
 				break;
+			case 'Immolate':
+				if (this.tag == 1) {
+					name += ' (DoT)';
+				}
+				break;
 			case 'Opportunity Strike':
 				break;
 			default:
@@ -585,6 +626,10 @@ export class ActionId {
 
 	static fromRandomSuffix(item: Item, randomSuffix: ItemRandomSuffix): ActionId {
 		return ActionId.fromItemId(item.id, 0, randomSuffix.id);
+	}
+
+	static fromReforge(item: Item, reforge: ReforgeStat): ActionId {
+		return ActionId.fromItemId(item.id, 0, reforge.id);
 	}
 
 	static fromProto(protoId: ActionIdProto): ActionId {
@@ -721,6 +766,7 @@ const petNameToIcon: Record<string, string> = {
 	Serpent: 'https://wow.zamimg.com/images/wow/icons/medium/spell_nature_guardianward.jpg',
 	Silithid: 'https://wow.zamimg.com/images/wow/icons/medium/ability_hunter_pet_silithid.jpg',
 	Spider: 'https://wow.zamimg.com/images/wow/icons/medium/ability_hunter_pet_spider.jpg',
+	'Shale Spider': 'https://wow.zamimg.com/images/wow/icons/medium/ability_hunter_pet_spider.jpg',
 	'Spirit Beast': 'https://wow.zamimg.com/images/wow/icons/medium/ability_druid_primalprecision.jpg',
 	'Spore Bat': 'https://wow.zamimg.com/images/wow/icons/medium/ability_hunter_pet_sporebat.jpg',
 	Succubus: 'https://wow.zamimg.com/images/wow/icons/large/spell_shadow_summonsuccubus.jpg',
@@ -731,6 +777,7 @@ const petNameToIcon: Record<string, string> = {
 	'Wind Serpent': 'https://wow.zamimg.com/images/wow/icons/medium/ability_hunter_pet_windserpent.jpg',
 	Wolf: 'https://wow.zamimg.com/images/wow/icons/medium/ability_hunter_pet_wolf.jpg',
 	Worm: 'https://wow.zamimg.com/images/wow/icons/medium/ability_hunter_pet_worm.jpg',
+	Fox: 'https://wow.zamimg.com/images/wow/icons/medium/inv_misc_monstertail_07.jpg',
 };
 
 export function getPetIconFromName(name: string): string | ActionId | undefined {
@@ -759,4 +806,4 @@ export const buffAuraToSpellIdMap: Record<number, ActionId> = {
 	96228: ActionId.fromSpellId(82174), // Synapse Springs - Agi
 	96229: ActionId.fromSpellId(82174), // Synapse Springs - Str
 	96230: ActionId.fromSpellId(82174), // Synapse Springs - Int
-}
+};

@@ -114,10 +114,13 @@ func (cat *FeralDruid) newActionCatOptimalRotationAction(_ *core.APLRotation, co
 		BiteTime:           config.BiteTime,
 		BiteDuringExecute:  config.BiteDuringExecute,
 		MangleSpam:         false,
-		Powerbear:          false,
 		MinRoarOffset:      config.MinRoarOffset,
 		RipLeeway:          config.RipLeeway,
 		ManualParams:       config.ManualParams,
+		AllowAoeBerserk:    config.AllowAoeBerserk,
+		MeleeWeave:         config.MeleeWeave,
+		BearWeave:          config.BearWeave,
+		SnekWeave:          config.SnekWeave,
 	}
 
 	cat.setupRotation(rotationOptions)
@@ -136,16 +139,43 @@ func (action *APLActionCatOptimalRotationAction) Execute(sim *core.Simulation) {
 
 	// If a melee swing resulted in an Omen proc, then schedule the
 	// next player decision based on latency.
-	if cat.ClearcastingAura.RemainingDuration(sim) == cat.ClearcastingAura.Duration {
+	ccRefreshTime := cat.ClearcastingAura.ExpiresAt() - cat.ClearcastingAura.Duration
+
+	if ccRefreshTime >= sim.CurrentTime-cat.ReactionTime {
 		// Kick gcd loop, also need to account for any gcd 'left'
 		// otherwise it breaks gcd logic
-		kickTime := max(cat.NextRotationActionAt(), sim.CurrentTime+cat.ReactionTime)
+		kickTime := max(cat.NextGCDAt(), ccRefreshTime+cat.ReactionTime)
 		cat.NextRotationAction(sim, kickTime)
 	}
 
 	action.lastAction = sim.CurrentTime
 
+	// Keep up Sunder debuff if not provided externally. Do this here since FF can be
+	// cast while moving.
+	if cat.Rotation.MaintainFaerieFire {
+		for _, aoeTarget := range sim.Encounter.TargetUnits {
+			if cat.ShouldFaerieFire(sim, aoeTarget) {
+				cat.FaerieFire.Cast(sim, aoeTarget)
+			}
+		}
+	}
+
+	// Handle movement before any rotation logic
+	if cat.Moving {
+		return
+	}
+	if cat.DistanceFromTarget > core.MaxMeleeRange {
+		// Try leaping first before defaulting to manual movement
+		if cat.CatCharge.CanCast(sim, cat.CurrentTarget) {
+			cat.CatCharge.Cast(sim, cat.CurrentTarget)
+		} else {
+			cat.MoveTo(core.MaxMeleeRange-1, sim) // movement aura is discretized in 1 yard intervals, so need to overshoot to guarantee melee range
+			return
+		}
+	}
+
 	if !cat.GCD.IsReady(sim) {
+		cat.WaitUntil(sim, cat.NextGCDAt())
 		return
 	}
 
@@ -154,8 +184,10 @@ func (action *APLActionCatOptimalRotationAction) Execute(sim *core.Simulation) {
 		cat.TryBerserk(sim)
 	}
 
-	if cat.customRotationAction == nil || sim.CurrentTime >= cat.customRotationAction.NextActionAt {
+	if sim.CurrentTime >= cat.nextActionAt {
 		cat.OnGCDReady(sim)
+	} else {
+		cat.WaitUntil(sim, cat.nextActionAt)
 	}
 }
 

@@ -131,10 +131,12 @@ func NewTarget(options *proto.Target, targetIndex int32) *Target {
 			Metrics:     NewUnitMetrics(),
 
 			StatDependencyManager: stats.NewStatDependencyManager(),
+			ReactionTime:          time.Millisecond * 1620,
 		},
 	}
 	defaultRaidBossLevel := int32(CharacterLevel + 3)
 	target.GCD = target.NewTimer()
+	target.RotationTimer = target.NewTimer()
 	if target.Level == 0 {
 		target.Level = defaultRaidBossLevel
 	}
@@ -205,7 +207,8 @@ type AttackTable struct {
 	NatureDamageTakenMultiplier  float64
 	HauntSEDamageTakenMultiplier float64
 	HealingDealtMultiplier       float64
-	IgnoreArmor                  bool // Ignore defender's armor for specifically this attacker's attacks
+	IgnoreArmor                  bool    // Ignore defender's armor for specifically this attacker's attacks
+	BonusCritRating              float64 // crit rating modifier
 
 	// This is for "Apply Aura: Mod Damage Done By Caster" effects.
 	// If set, the damage taken multiplier is multiplied by the callbacks result.

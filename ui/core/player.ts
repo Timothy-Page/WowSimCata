@@ -1,5 +1,4 @@
-import { ReforgeData } from './components/gear_picker';
-import { getLanguageCode } from './constants/lang';
+import Toast from './components/toast';
 import * as Mechanics from './constants/mechanics';
 import { MAX_PARTY_SIZE, Party } from './party';
 import { PlayerClass } from './player_class';
@@ -78,6 +77,7 @@ import { Sim, SimSettingCategories } from './sim';
 import { playerTalentStringToProto } from './talents/factory';
 import { EventID, TypedEvent } from './typed_event';
 import { stringComparator, sum } from './utils';
+import { buildWowheadTooltipDataset } from './wowhead';
 
 export interface AuraStats {
 	data: AuraStatsProto;
@@ -217,6 +217,16 @@ export function getSpecConfig<SpecType extends Spec>(spec: SpecType): PlayerConf
 		throw new Error('No config registered for Spec: ' + spec);
 	}
 	return config;
+}
+
+export interface ReforgeData {
+	id: number;
+	item: Item;
+	reforge: ReforgeStat;
+	fromStat: Stat[];
+	toStat: Stat[];
+	fromAmount: number;
+	toAmount: number;
 }
 
 // Manages all the gear / consumes / other settings for a single Player.
@@ -437,13 +447,30 @@ export class Player<SpecType extends Spec> {
 	}
 
 	// Returns all reforgings that are valid with a given item
-	getAvailableReforgings(item: Item): ReforgeStat[] | undefined {
-		return this.sim.db.getAvailableReforges(item);
+	getAvailableReforgings(item: Item): Array<ReforgeData> {
+		return this.sim.db.getAvailableReforges(item).map(reforge => {
+			return this.getReforgeData(item, reforge);
+		});
 	}
 
 	// Returns reforge given an id
 	getReforge(id: number): ReforgeStat | undefined {
-		return this.sim.db.getReforge(id);
+		return this.sim.db.getReforgeById(id);
+	}
+
+	getReforgeData(item: Item, reforge: ReforgeStat): ReforgeData {
+		const fromAmount = Math.ceil(-item.stats[reforge.fromStat[0]] * reforge.multiplier);
+		const toAmount = Math.floor(item.stats[reforge.fromStat[0]] * reforge.multiplier);
+
+		return {
+			id: reforge.id,
+			reforge: reforge,
+			item: item,
+			fromStat: reforge.fromStat,
+			fromAmount: fromAmount,
+			toStat: reforge.toStat,
+			toAmount,
+		};
 	}
 
 	// Returns all enchants that this player can wear in the given slot.
@@ -507,9 +534,17 @@ export class Player<SpecType extends Spec> {
 		epPseudoStats: Array<PseudoStat>,
 		epReferenceStat: Stat,
 		onProgress: (_: any) => void,
-	): Promise<StatWeightsResult> {
-		const result = await this.sim.statWeights(this, epStats, epPseudoStats, epReferenceStat, onProgress);
-		return result;
+	): Promise<StatWeightsResult | null> {
+		try {
+			const result = await this.sim.statWeights(this, epStats, epPseudoStats, epReferenceStat, onProgress);
+			return result;
+		} catch (error: any) {
+			new Toast({
+				variant: 'error',
+				body: error?.message || 'Something went wrong calculating your stat weights. Reload the page and try again.',
+			});
+			return null;
+		}
 	}
 
 	getCurrentStats(): PlayerStats {
@@ -1144,43 +1179,21 @@ export class Player<SpecType extends Spec> {
 		return ep;
 	}
 
-	setWowheadData(equippedItem: EquippedItem, elem: HTMLElement) {
-		const parts = [];
-
-		const lang = getLanguageCode();
-		const langPrefix = lang ? lang + '.' : '';
-		parts.push(`domain=${langPrefix}cata`);
-
+	async setWowheadData(equippedItem: EquippedItem, elem: HTMLElement) {
 		const isBlacksmithing = this.hasProfession(Profession.Blacksmithing);
-		if (equippedItem.gems.length > 0) {
-			parts.push(
-				'gems=' +
-					equippedItem
-						.curGems(isBlacksmithing)
-						.map(gem => (gem ? gem.id : 0))
-						.join(':'),
-			);
-		}
-		if (equippedItem.enchant != null) {
-			parts.push('ench=' + equippedItem.enchant.effectId);
-		}
-		if (equippedItem.reforging > 0) {
-			parts.push('forg=' + equippedItem.reforging);
-		}
-		parts.push(
-			'pcs=' +
-				this.gear
-					.asArray()
-					.filter(ei => ei != null)
-					.map(ei => ei!.item.id)
-					.join(':'),
-		);
+		const gemIds = equippedItem.gems.length ? equippedItem.curGems(isBlacksmithing).map(gem => (gem ? gem.id : 0)) : [];
 
-		if (equippedItem.hasExtraSocket(isBlacksmithing)) {
-			parts.push('sock');
-		}
-		parts.push('dataEnv=11');
-		elem.dataset.wowhead = parts.join('&');
+		equippedItem.asActionId().setWowheadDataset(elem, {
+			gemIds,
+			enchantId: equippedItem.enchant?.effectId,
+			reforgeId: equippedItem.reforge?.id,
+			setPieceIds: this.gear
+				.asArray()
+				.filter(ei => ei != null)
+				.map(ei => ei!.item.id),
+			hasExtraSocket: equippedItem.hasExtraSocket(isBlacksmithing),
+		});
+
 		elem.dataset.whtticon = 'false';
 	}
 

@@ -28,60 +28,30 @@ type Priest struct {
 	SurgeOfLightProcAura *core.Aura
 
 	// might want to move these spell / talents into spec specific initialization
-	Archangel         *core.Spell
-	DarkArchangel     *core.Spell
-	BindingHeal       *core.Spell
-	CircleOfHealing   *core.Spell
-	DevouringPlague   *core.Spell
-	FlashHeal         *core.Spell
-	GreaterHeal       *core.Spell
-	HolyFire          *core.Spell
-	InnerFocus        *core.Spell
-	ShadowWordPain    *core.Spell
-	MindBlast         *core.Spell
-	MindFlay          []*core.Spell
-	MindFlayAPL       *core.Spell
-	MindSear          []*core.Spell
-	MindSearAPL       *core.Spell
-	Penance           *core.Spell
-	PenanceHeal       *core.Spell
-	PowerWordShield   *core.Spell
-	PrayerOfHealing   *core.Spell
-	PrayerOfMending   *core.Spell
-	Renew             *core.Spell
-	EmpoweredRenew    *core.Spell
-	ShadowWordDeath   *core.Spell
-	Shadowfiend       *core.Spell
-	Smite             *core.Spell
-	VampiricTouch     *core.Spell
-	Dispersion        *core.Spell
-	MindSpike         *core.Spell
-	ShadowyApparition *core.Spell
+	BindingHeal     *core.Spell
+	CircleOfHealing *core.Spell
+	FlashHeal       *core.Spell
+	GreaterHeal     *core.Spell
+	Penance         *core.Spell
+	PenanceHeal     *core.Spell
+	PowerWordShield *core.Spell
+	PrayerOfHealing *core.Spell
+	PrayerOfMending *core.Spell
+	Renew           *core.Spell
+	EmpoweredRenew  *core.Spell
+	InnerFocus      *core.Spell
+	HolyFire        *core.Spell
+	Smite           *core.Spell
+	DevouringPlague *core.Spell
+	ShadowWordPain  *core.Spell
+	Shadowfiend     *core.Spell
+	VampiricTouch   *core.Spell
 
 	WeakenedSouls core.AuraArray
 
 	ProcPrayerOfMending core.ApplySpellResults
 
-	ScalingBaseDamage    float64
-	ShadowCritMultiplier float64
-
-	// set bonus cache
-	// The mana cost of your Mind Blast is reduced by 10%.
-	T7TwoSetBonus bool
-	// Your Shadow Word: Death has an additional 10% chance to critically strike.
-	T7FourSetBonus bool
-	// Increases the damage done by your Devouring Plague by 15%.
-	T8TwoSetBonus bool
-	// Your Mind Blast also grants you 240 haste for 4 sec.
-	T8FourSetBonus bool
-	// Increases the duration of your Vampiric Touch spell by 6 sec.
-	T9TwoSetBonus bool
-	// Increases the critical strike chance of your Mind Flay spell by 5%.
-	T9FourSetBonus bool
-	// The critical strike chance of your Shadow Word: Pain, Devouring Plague, and Vampiric Touch spells is increased by 5%
-	T10TwoSetBonus bool
-	// Reduces the channel duration by 0.51 sec and period by 0.17 sec on your Mind Flay spell
-	T10FourSetBonus bool
+	ClassSpellScaling float64
 }
 
 type SelfBuffs struct {
@@ -115,10 +85,6 @@ func (priest *Priest) AddPartyBuffs(_ *proto.PartyBuffs) {
 }
 
 func (priest *Priest) Initialize() {
-
-	// base scaling value for a level 85 priest
-	priest.ScalingBaseDamage = 945.188842773437500
-
 	if priest.SelfBuffs.UseInnerFire {
 		priest.AddStat(stats.SpellPower, 531)
 		priest.ApplyEquipScaling(stats.Armor, 1.6)
@@ -139,26 +105,10 @@ func (priest *Priest) Initialize() {
 	priest.registerDispersionSpell()
 	priest.registerMindSpike()
 
-	// priest.registerPowerInfusionCD()
+	priest.registerPowerInfusionSpell()
 
-	priest.MindFlayAPL = priest.newMindFlaySpell(0)
-	priest.MindSearAPL = priest.newMindSearSpell(0)
-
-	priest.MindFlay = []*core.Spell{
-		nil, // So we can use # of ticks as the index
-		priest.newMindFlaySpell(1),
-		priest.newMindFlaySpell(2),
-		priest.newMindFlaySpell(3),
-	}
-
-	priest.MindSear = []*core.Spell{
-		nil, // So we can use # of ticks as the index
-		priest.newMindSearSpell(1),
-		priest.newMindSearSpell(2),
-		priest.newMindSearSpell(3),
-		priest.newMindSearSpell(4),
-		priest.newMindSearSpell(5),
-	}
+	priest.newMindFlaySpell()
+	priest.newMindSearSpell()
 }
 
 // func (priest *Priest) RegisterHealingSpells() {
@@ -192,9 +142,10 @@ func (priest *Priest) Reset(_ *core.Simulation) {
 
 func New(char *core.Character, selfBuffs SelfBuffs, talents string) *Priest {
 	priest := &Priest{
-		Character: *char,
-		SelfBuffs: selfBuffs,
-		Talents:   &proto.PriestTalents{},
+		Character:         *char,
+		SelfBuffs:         selfBuffs,
+		Talents:           &proto.PriestTalents{},
+		ClassSpellScaling: core.GetClassSpellScalingCoefficient(proto.Class_ClassPriest),
 	}
 
 	core.FillTalentsProto(priest.Talents.ProtoReflect(), talents, TalentTreeSizes)
@@ -302,9 +253,9 @@ const (
 )
 
 func (priest *Priest) calcBaseDamage(sim *core.Simulation, coefficient float64, variance float64) float64 {
-	baseDamage := priest.ScalingBaseDamage * coefficient
+	baseDamage := priest.ClassSpellScaling * coefficient
 	if variance > 0 {
-		delta := priest.ScalingBaseDamage * variance * 0.5
+		delta := priest.ClassSpellScaling * variance * 0.5
 		baseDamage += sim.Roll(-delta, delta)
 	}
 

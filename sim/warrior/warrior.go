@@ -33,6 +33,7 @@ const (
 	SpellMaskShieldWall
 	SpellMaskLastStand
 	SpellMaskDeadlyCalm
+	SpellMaskCharge
 
 	// Abilities that cost rage but aren't attacks
 	SpellMaskDemoShout
@@ -73,6 +74,8 @@ const EnrageTag = "EnrageEffect"
 type Warrior struct {
 	core.Character
 
+	ClassSpellScaling float64
+
 	Talents *proto.WarriorTalents
 
 	WarriorInputs
@@ -101,6 +104,7 @@ type Warrior struct {
 	ThunderClap       *core.Spell
 	Whirlwind         *core.Spell
 	DeepWounds        *core.Spell
+	Charge            *core.Spell
 
 	recklessnessDeadlyCalmCD *core.Timer
 	hsCleaveCD               *core.Timer
@@ -163,25 +167,29 @@ func (warrior *Warrior) Initialize() {
 	warrior.RegisterSunderArmor()
 	warrior.RegisterThunderClapSpell()
 	warrior.RegisterWhirlwindSpell()
+	warrior.RegisterCharge()
 }
 
 func (warrior *Warrior) Reset(_ *core.Simulation) {
+	warrior.Stance = StanceNone
 }
 
 func NewWarrior(character *core.Character, talents string, inputs WarriorInputs) *Warrior {
 	warrior := &Warrior{
-		Character:     *character,
-		Talents:       &proto.WarriorTalents{},
-		WarriorInputs: inputs,
+		Character:         *character,
+		Talents:           &proto.WarriorTalents{},
+		WarriorInputs:     inputs,
+		ClassSpellScaling: core.GetClassSpellScalingCoefficient(proto.Class_ClassWarrior),
 	}
 	core.FillTalentsProto(warrior.Talents.ProtoReflect(), talents, TalentTreeSizes)
 
 	warrior.PseudoStats.CanParry = true
 
 	warrior.AddStatDependency(stats.Agility, stats.MeleeCrit, core.CritPerAgiMaxLevel[character.Class]*core.CritRatingPerCritChance)
-	warrior.AddStatDependency(stats.Agility, stats.Dodge, core.DodgeRatingPerDodgeChance/84.746)
+	// Dodge no longer granted from agility
 	warrior.AddStatDependency(stats.Strength, stats.AttackPower, 2)
-	warrior.AddStatDependency(stats.Strength, stats.BlockValue, .5) // 50% block from str
+	warrior.AddStat(stats.Parry, -warrior.GetBaseStats()[stats.Strength]*0.27) // Does not apply to base Strength
+	warrior.AddStatDependency(stats.Strength, stats.Parry, 0.27)               // Change from block to pary in cata (4.2 Changed from 25->27 percent)
 	warrior.AddStatDependency(stats.BonusArmor, stats.Armor, 1)
 
 	// Base dodge unaffected by Diminishing Returns

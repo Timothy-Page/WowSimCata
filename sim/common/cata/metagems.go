@@ -23,7 +23,7 @@ func init() {
 
 	// Eternal Shadowspirit Diamond
 	core.NewItemEffect(52293, func(agent core.Agent) {
-		agent.GetCharacter().PseudoStats.BlockValueMultiplier += 0.01
+		agent.GetCharacter().PseudoStats.BlockDamageReduction += 0.01
 	})
 
 	// Austere Shadowspirit Diamond
@@ -49,9 +49,6 @@ func init() {
 	})
 
 	// These are handled in character.go, but create empty effects so they are included in tests.
-	core.NewItemEffect(41285, func(_ core.Agent) {}) // Chaotic Skyflare Diamond
-	core.NewItemEffect(41376, func(_ core.Agent) {}) // Revitalizing Skyflare Diamond
-	core.NewItemEffect(41398, func(_ core.Agent) {}) // Relentless Earthsiege Diamond
 	core.NewItemEffect(52291, func(_ core.Agent) {}) // Chaotic Shadowspirit Diamond
 	core.NewItemEffect(52297, func(_ core.Agent) {}) // Revitalizing Shadowspirit Diamond
 	core.NewItemEffect(68778, func(_ core.Agent) {}) // Agile Shadowspirit Diamond

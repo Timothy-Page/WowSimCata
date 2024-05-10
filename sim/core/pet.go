@@ -68,7 +68,7 @@ func NewPet(name string, owner *Character, baseStats stats.Stats, statInheritanc
 
 				ReactionTime: owner.ReactionTime,
 
-				DistanceFromTarget: 5,
+				StartDistanceFromTarget: MaxMeleeRange, // TODO: Match to owner and add movement logic to pet rotations
 			},
 			Name:       name,
 			Party:      owner.Party,
@@ -235,11 +235,8 @@ func (pet *Pet) Disable(sim *Simulation) {
 		return
 	}
 
-	// Remove inherited stats on dismiss if not permanent
-	if pet.isGuardian || pet.timeoutAction != nil {
-		pet.AddStatsDynamic(sim, pet.inheritedStats.Invert())
-		pet.inheritedStats = stats.Stats{}
-	}
+	pet.AddStatsDynamic(sim, pet.inheritedStats.Invert())
+	pet.inheritedStats = stats.Stats{}
 
 	if pet.dynamicStatInheritance != nil {
 		if idx := slices.Index(pet.Owner.DynamicStatsPets, pet); idx != -1 {

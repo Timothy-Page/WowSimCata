@@ -15,6 +15,8 @@ const ThoridalTheStarsFuryItemID = 34334
 type Hunter struct {
 	core.Character
 
+	ClassSpellScaling float64
+
 	Talents             *proto.HunterTalents
 	Options             *proto.HunterOptions
 	BeastMasteryOptions *proto.BeastMasteryHunter_Options
@@ -57,8 +59,8 @@ type Hunter struct {
 	CobraShot     *core.Spell
 
 	// Fake spells to encapsulate weaving logic.
-	TrapWeaveSpell *core.Spell
-
+	TrapWeaveSpell                *core.Spell
+	ImprovedSerpentSting          *core.Spell
 	AspectOfTheHawkAura           *core.Aura
 	AspectOfTheFoxAura            *core.Aura
 	ImprovedSteadyShotAura        *core.Aura
@@ -83,9 +85,10 @@ func (hunter *Hunter) GetHunter() *Hunter {
 
 func NewHunter(character *core.Character, options *proto.Player, hunterOptions *proto.HunterOptions) *Hunter {
 	hunter := &Hunter{
-		Character: *character,
-		Talents:   &proto.HunterTalents{},
-		Options:   hunterOptions,
+		Character:         *character,
+		Talents:           &proto.HunterTalents{},
+		Options:           hunterOptions,
+		ClassSpellScaling: core.GetClassSpellScalingCoefficient(proto.Class_ClassHunter),
 	}
 
 	core.FillTalentsProto(hunter.Talents.ProtoReflect(), options.TalentsString, TalentTreeSizes)
@@ -165,6 +168,22 @@ func (hunter *Hunter) AddRaidBuffs(raidBuffs *proto.RaidBuffs) {
 	}
 	if hunter.Talents.FerociousInspiration && hunter.Options.PetType != proto.HunterOptions_PetNone {
 		raidBuffs.FerociousInspiration = true
+	}
+
+	if hunter.Options.PetType == proto.HunterOptions_CoreHound {
+		raidBuffs.Bloodlust = true
+	}
+
+	if hunter.Options.PetType == proto.HunterOptions_Silithid {
+		raidBuffs.BloodPact = true
+	}
+
+	if hunter.Options.PetType == proto.HunterOptions_ShaleSpider {
+		raidBuffs.BlessingOfKings = true
+	}
+
+	if hunter.Options.PetType == proto.HunterOptions_Wolf || hunter.Options.PetType == proto.HunterOptions_Devilsaur {
+		raidBuffs.FuriousHowl = true
 	}
 
 	if hunter.Talents.HuntingParty {

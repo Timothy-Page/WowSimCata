@@ -67,6 +67,11 @@ func (distMetrics *DistributionMetrics) ToProto() *proto.DistributionMetrics {
 		MinSeed:   distMetrics.minSeed,
 		Hist:      distMetrics.hist,
 		AllValues: distMetrics.sample,
+
+		AggregatorData: &proto.AggregatorData{
+			N:     int32(distMetrics.n),
+			SumSq: distMetrics.sumSq,
+		},
 	}
 }
 
@@ -297,6 +302,11 @@ func (unit *Unit) NewFocusMetrics(actionID ActionID) *ResourceMetrics {
 func (unitMetrics *UnitMetrics) addSpellMetrics(spell *Spell, actionID ActionID, spellMetrics []SpellMetrics) {
 	actionMetrics, ok := unitMetrics.actions[actionID]
 
+	// no targets, nothing to add here
+	if len(spell.Unit.AttackTables) == 0 {
+		return
+	}
+
 	if !ok {
 		actionMetrics = &ActionMetrics{IsMelee: spell.Flags.Matches(SpellFlagMeleeMetrics)}
 		unitMetrics.actions[actionID] = actionMetrics
@@ -356,11 +366,6 @@ func (unitMetrics *UnitMetrics) MarkOOM(sim *Simulation) {
 		unitMetrics.WentOOM = true
 		unitMetrics.FirstOOMTimestamp = sim.CurrentTime
 	}
-}
-
-func (unitMetrics *UnitMetrics) UpdateDpasp(dpspSeconds float64) {
-	// We store the total of seconds * spell power due to how DistributionMetrics work internally.
-	unitMetrics.dpasp.Total += dpspSeconds
 }
 
 func (unitMetrics *UnitMetrics) reset() {
@@ -556,5 +561,10 @@ func (auraMetrics *AuraMetrics) ToProto() *proto.AuraMetrics {
 		UptimeSecondsAvg:   mean,
 		UptimeSecondsStdev: stdev,
 		ProcsAvg:           float64(auraMetrics.procsSum) / float64(auraMetrics.n),
+
+		AggregatorData: &proto.AggregatorData{
+			N:     int32(auraMetrics.n),
+			SumSq: auraMetrics.sumSq,
+		},
 	}
 }

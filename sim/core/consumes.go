@@ -138,7 +138,7 @@ func applyConsumeEffects(agent Agent) {
 			})
 		case proto.BattleElixir_ElixirOfArmorPiercing:
 			character.AddStats(stats.Stats{
-				stats.Agility: 25,
+				stats.Agility:   25,
 				stats.MeleeCrit: 25,
 				stats.SpellCrit: 25,
 			})
@@ -427,24 +427,6 @@ func applyConsumeEffects(agent Agent) {
 	registerTinkerHandsCD(agent, consumes)
 }
 
-func ApplyPetConsumeEffects(pet *Character, ownerConsumes *proto.Consumes) {
-	switch ownerConsumes.PetFood {
-	case proto.PetFood_PetFoodSpicedMammothTreats:
-		pet.AddStats(stats.Stats{
-			stats.Strength: 30,
-			stats.Stamina:  30,
-		})
-	case proto.PetFood_PetFoodKiblersBits:
-		pet.AddStats(stats.Stats{
-			stats.Strength: 20,
-			stats.Stamina:  20,
-		})
-	}
-
-	pet.AddStat(stats.Agility, []float64{0, 5, 9, 13, 17, 20}[ownerConsumes.PetScrollOfAgility])
-	pet.AddStat(stats.Strength, []float64{0, 5, 9, 13, 17, 20}[ownerConsumes.PetScrollOfStrength])
-}
-
 var PotionAuraTag = "Potion"
 
 func registerPotionCD(agent Agent, consumes *proto.Consumes) {
@@ -548,7 +530,7 @@ func makePotionActivationInternal(potionType proto.Potions, character *Character
 			Type: CooldownTypeMana,
 			ShouldActivate: func(sim *Simulation, character *Character) bool {
 				// Only pop if we have less than the max mana provided by the potion minus 1mp5 tick.
-				totalRegen := character.ManaRegenPerSecondWhileCasting() * 5
+				totalRegen := character.ManaRegenPerSecondWhileCombat() * 5
 				manaGain := 10750.0
 				if alchStoneEquipped && potionType == proto.Potions_MythicalManaPotion {
 					manaGain *= 1.4
@@ -637,7 +619,7 @@ func makePotionActivationInternal(potionType proto.Potions, character *Character
 			Type: CooldownTypeSurvival,
 			ShouldActivate: func(sim *Simulation, character *Character) bool {
 				// Only pop if we have less than the max mana provided by the potion minus 1mp5 tick.
-				totalRegen := character.ManaRegenPerSecondWhileCasting() * 5
+				totalRegen := character.ManaRegenPerSecondWhileCombat() * 5
 				manaGain := 11000.0
 				if alchStoneEquipped && potionType == proto.Potions_MythicalManaPotion {
 					manaGain *= 1.4
@@ -757,7 +739,7 @@ func registerConjuredCD(agent Agent, consumes *proto.Consumes) {
 			Type:  CooldownTypeMana,
 			ShouldActivate: func(sim *Simulation, character *Character) bool {
 				// Only pop if we have less than the max mana provided by the potion minus 1mp5 tick.
-				totalRegen := character.ManaRegenPerSecondWhileCasting() * 5
+				totalRegen := character.ManaRegenPerSecondWhileCombat() * 5
 				return character.MaxMana()-(character.CurrentMana()+totalRegen) >= 1500
 			},
 		})

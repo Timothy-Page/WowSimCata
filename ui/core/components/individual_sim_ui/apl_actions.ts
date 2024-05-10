@@ -13,6 +13,7 @@ import {
 	APLActionCustomRotation,
 	APLActionItemSwap,
 	APLActionItemSwap_SwapSet as ItemSwapSet,
+	APLActionMove,
 	APLActionMultidot,
 	APLActionMultishield,
 	APLActionResetSequence,
@@ -23,6 +24,7 @@ import {
 	APLActionWait,
 	APLActionWaitUntil,
 	APLValue,
+	APLActionMoveDuration,
 } from '../../proto/apl.js';
 import { Spec } from '../../proto/common.js';
 import { FeralDruid_Rotation_AplType } from '../../proto/druid.js';
@@ -573,7 +575,30 @@ const actionKindFactories: { [f in NonNullable<APLActionKind>]: ActionKindConfig
 		newValue: () => APLActionItemSwap.create(),
 		fields: [itemSwapSetFieldConfig('swapSet')],
 	}),
-
+	['move']: inputBuilder({
+		label: 'Move',
+		submenu: ['Misc'],
+		shortDescription: 'Starts a move to the desired range from target.',
+		newValue: () => APLActionMove.create(),
+		fields: [
+			AplValues.valueFieldConfig('rangeFromTarget', {
+				label: 'to Range',
+				labelTooltip: 'Desired range from target.',
+			}),
+		],
+	}),
+	['moveDuration']: inputBuilder({
+		label: 'Move duration',
+		submenu: ['Misc'],
+		shortDescription: 'The characters moves for the given duration.',
+		newValue: () => APLActionMoveDuration.create(),
+		fields: [
+			AplValues.valueFieldConfig('duration', {
+				label: 'Duration',
+				labelTooltip: 'Amount of time the character should move.',
+			})
+		]
+	}),
 	['customRotation']: inputBuilder({
 		label: 'Custom Rotation',
 		//submenu: ['Misc'],
@@ -594,17 +619,33 @@ const actionKindFactories: { [f in NonNullable<APLActionKind>]: ActionKindConfig
 				rotationType: FeralDruid_Rotation_AplType.SingleTarget,
 				maintainFaerieFire: true,
 				manualParams: true,
-				minRoarOffset: 12.0,
-				ripLeeway: 4,
+				minRoarOffset: 29.0,
+				ripLeeway: 1,
 				useRake: true,
 				useBite: true,
-				biteTime: 10.0,
+				biteTime: 11.0,
 				biteDuringExecute: true,
+				allowAoeBerserk: false,
+				meleeWeave: true,
+				bearWeave: true,
+				snekWeave: true,
 			}),
 		fields: [
 			AplHelpers.rotationTypeFieldConfig('rotationType'),
 			AplHelpers.booleanFieldConfig('maintainFaerieFire', 'Maintain Faerie Fire', {
 				labelTooltip: 'Maintain Faerie Fire debuff. Overwrites any external Sunder effects specified in settings.',
+			}),
+			AplHelpers.booleanFieldConfig('meleeWeave', 'Enable leave-weaving', {
+				labelTooltip: 'Weave out of melee range for Stampede procs. Ignored for AoE rotation or if Stampede is not talented.',
+			}),
+			AplHelpers.booleanFieldConfig('bearWeave', 'Enable bear-weaving', {
+				labelTooltip: 'Weave into Bear Form while pooling Energy. Ignored for AoE rotation.',
+			}),
+			AplHelpers.booleanFieldConfig('snekWeave', 'Use Albino Snake', {
+				labelTooltip: 'Reset swing timer at the end of bear-weaves using Albino Snake pet. Ignored if not bear-weaving.',
+			}),
+			AplHelpers.booleanFieldConfig('allowAoeBerserk', 'Allow AoE Berserk', {
+				labelTooltip: 'Allow Berserk usage in AoE rotation. Ignored for single target rotation.',
 			}),
 			AplHelpers.booleanFieldConfig('manualParams', 'Manual Advanced Parameters', {
 				labelTooltip: 'Manually specify advanced parameters, otherwise will use preset defaults.',
@@ -629,8 +670,7 @@ const actionKindFactories: { [f in NonNullable<APLActionKind>]: ActionKindConfig
 				labelTooltip: 'Min seconds remaining on Rip/Roar to allow a Bite. Ignored if not Biting during rotation.',
 			}),
 			AplHelpers.booleanFieldConfig('biteDuringExecute', 'Bite during Execute phase', {
-				labelTooltip:
-					'Bite aggressively during Execute phase. Ignored if Blood in the Water is not talented, or if not using manual advanced parameters.',
+				labelTooltip: 'Bite aggressively during Execute phase. Ignored if Blood in the Water is not talented, or if not using manual advanced parameters.',
 			}),
 		],
 	}),

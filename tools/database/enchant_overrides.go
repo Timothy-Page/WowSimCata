@@ -102,6 +102,7 @@ var EnchantOverrides = []*proto.UIEnchant{
 	{EffectId: 4124, ItemId: 56503, SpellId: 78170, Name: "Twilight Leg Armor", Quality: proto.ItemQuality_ItemQualityRare, Stats: stats.Stats{stats.Stamina: 85, stats.Agility: 45}.ToFloatArray(), Type: proto.ItemType_ItemTypeLegs},
 	{EffectId: 4126, ItemId: 56550, SpellId: 78171, Name: "Dragonscale Leg Armor", Quality: proto.ItemQuality_ItemQualityEpic, Stats: stats.Stats{stats.MeleeCrit: 55, stats.SpellCrit: 55, stats.AttackPower: 190, stats.RangedAttackPower: 190}.ToFloatArray(), Type: proto.ItemType_ItemTypeLegs},
 	{EffectId: 4127, ItemId: 56551, SpellId: 78172, Name: "Charscale Leg Armor", Quality: proto.ItemQuality_ItemQualityEpic, Stats: stats.Stats{stats.Stamina: 145, stats.Agility: 55}.ToFloatArray(), Type: proto.ItemType_ItemTypeLegs},
+	{EffectId: 4270, ItemId: 71720, SpellId: 101598, Name: "Drakehide Leg Armor", Quality: proto.ItemQuality_ItemQualityEpic, Stats: stats.Stats{stats.Stamina: 145, stats.Dodge: 55}.ToFloatArray(), Type: proto.ItemType_ItemTypeLegs},
 	{EffectId: 4440, SpellId: 85067, Name: "Dragonbone Leg Reinforcements", Quality: proto.ItemQuality_ItemQualityCommon, Stats: stats.Stats{stats.MeleeCrit: 55, stats.SpellCrit: 55, stats.AttackPower: 190, stats.RangedAttackPower: 190}.ToFloatArray(), Type: proto.ItemType_ItemTypeLegs, RequiredProfession: proto.Profession_Leatherworking},
 	{EffectId: 4439, SpellId: 85068, Name: "Charscale Leg Reinforcements", Quality: proto.ItemQuality_ItemQualityCommon, Stats: stats.Stats{stats.Stamina: 145, stats.Agility: 55}.ToFloatArray(), Type: proto.ItemType_ItemTypeLegs, RequiredProfession: proto.Profession_Leatherworking},
 
@@ -320,7 +321,7 @@ var EnchantOverrides = []*proto.UIEnchant{
 	{EffectId: 1952, SpellId: 44489, Name: "Defense", Quality: proto.ItemQuality_ItemQualityCommon, Stats: stats.Stats{stats.Defense: 20}.ToFloatArray(), Type: proto.ItemType_ItemTypeWeapon, EnchantType: proto.EnchantType_EnchantTypeShield},
 	{EffectId: 1128, SpellId: 60653, Name: "Greater Intellect", Quality: proto.ItemQuality_ItemQualityCommon, Stats: stats.Stats{stats.Intellect: 25}.ToFloatArray(), Type: proto.ItemType_ItemTypeWeapon, EnchantType: proto.EnchantType_EnchantTypeShield},
 	{EffectId: 3748, ItemId: 42500, SpellId: 56353, Name: "Titanium Shield Spike", Quality: proto.ItemQuality_ItemQualityUncommon, Stats: stats.Stats{}.ToFloatArray(), Type: proto.ItemType_ItemTypeWeapon, EnchantType: proto.EnchantType_EnchantTypeShield},
-	{EffectId: 3849, ItemId: 44936, SpellId: 62201, Name: "Titanium Plating", Quality: proto.ItemQuality_ItemQualityRare, Stats: stats.Stats{stats.BlockValue: 81}.ToFloatArray(), Type: proto.ItemType_ItemTypeWeapon, EnchantType: proto.EnchantType_EnchantTypeShield},
+	{EffectId: 3849, ItemId: 44936, SpellId: 62201, Name: "Titanium Plating", Quality: proto.ItemQuality_ItemQualityRare, Stats: stats.Stats{stats.Parry: 26}.ToFloatArray(), Type: proto.ItemType_ItemTypeWeapon, EnchantType: proto.EnchantType_EnchantTypeShield},
 
 	// Ring
 	{EffectId: 3839, SpellId: 44645, Name: "Assault", Quality: proto.ItemQuality_ItemQualityCommon, Stats: stats.Stats{stats.AttackPower: 40, stats.RangedAttackPower: 40}.ToFloatArray(), Type: proto.ItemType_ItemTypeFinger, RequiredProfession: proto.Profession_Enchanting},

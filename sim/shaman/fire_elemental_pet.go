@@ -9,18 +9,14 @@ import (
 	"github.com/wowsims/cata/sim/core/stats"
 )
 
-// Variables that control the Fire Elemental.
-const (
-	// 7.5 CPM
-	maxFireBlastCasts = 15
-	maxFireNovaCasts  = 15
-)
-
 type FireElemental struct {
 	core.Pet
 
 	FireBlast *core.Spell
 	FireNova  *core.Spell
+
+	maxFireBlastCasts int32
+	maxFireNovaCasts  int32
 
 	FireShieldAura *core.Aura
 
@@ -29,10 +25,14 @@ type FireElemental struct {
 
 func (shaman *Shaman) NewFireElemental(bonusSpellPower float64) *FireElemental {
 	fireElemental := &FireElemental{
-		Pet:         core.NewPet("Greater Fire Elemental", &shaman.Character, fireElementalPetBaseStats, shaman.fireElementalStatInheritance(), false, true),
-		shamanOwner: shaman,
+		Pet:               core.NewPet("Greater Fire Elemental", &shaman.Character, fireElementalPetBaseStats, shaman.fireElementalStatInheritance(), false, true),
+		shamanOwner:       shaman,
+		maxFireBlastCasts: 15,
+		maxFireNovaCasts:  15,
 	}
 	fireElemental.EnableManaBar()
+	fireElemental.AddStatDependency(stats.Intellect, stats.SpellPower, 1.0)
+	fireElemental.AddStat(stats.SpellPower, -10)
 	fireElemental.EnableAutoAttacks(fireElemental, core.AutoAttackOptions{
 		MainHand: core.Weapon{
 			BaseDamageMin:  429, //Estimated from beta testing
@@ -97,7 +97,7 @@ func (fireElemental *FireElemental) ExecuteCustomRotation(sim *core.Simulation) 
 	fireBlastCasts := fireElemental.FireBlast.SpellMetrics[0].Casts
 	fireNovaCasts := fireElemental.FireNova.SpellMetrics[0].Casts
 
-	if fireBlastCasts == maxFireBlastCasts && fireNovaCasts == maxFireNovaCasts {
+	if fireBlastCasts == fireElemental.maxFireBlastCasts && fireNovaCasts == fireElemental.maxFireNovaCasts {
 		return
 	}
 
@@ -109,12 +109,12 @@ func (fireElemental *FireElemental) ExecuteCustomRotation(sim *core.Simulation) 
 
 	//Melee the other 30%
 	if random >= .65 {
-		if !fireElemental.TryCast(sim, target, fireElemental.FireNova, maxFireNovaCasts) {
-			fireElemental.TryCast(sim, target, fireElemental.FireBlast, maxFireBlastCasts)
+		if !fireElemental.TryCast(sim, target, fireElemental.FireNova, fireElemental.maxFireNovaCasts) {
+			fireElemental.TryCast(sim, target, fireElemental.FireBlast, fireElemental.maxFireBlastCasts)
 		}
 	} else if random >= .35 {
-		if !fireElemental.TryCast(sim, target, fireElemental.FireBlast, maxFireBlastCasts) {
-			fireElemental.TryCast(sim, target, fireElemental.FireNova, maxFireNovaCasts)
+		if !fireElemental.TryCast(sim, target, fireElemental.FireBlast, fireElemental.maxFireBlastCasts) {
+			fireElemental.TryCast(sim, target, fireElemental.FireNova, fireElemental.maxFireNovaCasts)
 		}
 	}
 
@@ -139,9 +139,9 @@ func (fireElemental *FireElemental) TryCast(sim *core.Simulation, target *core.U
 }
 
 var fireElementalPetBaseStats = stats.Stats{
-	stats.Mana:        8893, //Estimated from beta testing
+	stats.Mana:        6803,
 	stats.Health:      4903, //Estimated from beta testing
-	stats.Intellect:   0,
+	stats.Intellect:   157,
 	stats.Stamina:     0,
 	stats.SpellPower:  0, //Estimated
 	stats.AttackPower: 0, //Estimated
@@ -168,8 +168,9 @@ func (shaman *Shaman) fireElementalStatInheritance() core.PetStatInheritance {
 			/*
 				TODO working on figuring this out, getting close need more trials. will need to remove specific buffs,
 				ie does not gain the benefit from draenei buff.
+				Scaled linearly to reach Expertise Soft Cap (26) when Shaman is at 17% Spell Hit Cap
 			*/
-			stats.Expertise: math.Floor(spellHitRatingFromOwner * 27 / 16),
+			stats.Expertise: math.Floor(ownerSpellHitChance / 17 * 26 * core.ExpertisePerQuarterPercentReduction),
 		}
 	}
 }

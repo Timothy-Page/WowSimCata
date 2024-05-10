@@ -12,7 +12,7 @@ func (druid *Druid) registerMangleBearSpell() {
 	glyphBonus := core.TernaryFloat64(druid.HasPrimeGlyph(proto.DruidPrimeGlyph_GlyphOfMangle), 1.1, 1.0)
 
 	druid.MangleBear = druid.RegisterSpell(Bear, core.SpellConfig{
-		ActionID:    core.ActionID{SpellID: 48564},
+		ActionID:    core.ActionID{SpellID: 33878},
 		SpellSchool: core.SpellSchoolPhysical,
 		ProcMask:    core.ProcMaskMeleeMHSpecial,
 		Flags:       core.SpellFlagMeleeMetrics | core.SpellFlagIncludeTargetBonusDamage | core.SpellFlagAPL,
@@ -28,7 +28,7 @@ func (druid *Druid) registerMangleBearSpell() {
 			IgnoreHaste: true,
 			CD: core.Cooldown{
 				Timer:    druid.NewTimer(),
-				Duration: time.Duration(float64(time.Second) * 6),
+				Duration: time.Second*6,
 			},
 		},
 
@@ -36,12 +36,13 @@ func (druid *Druid) registerMangleBearSpell() {
 		CritMultiplier:   druid.DefaultMeleeCritMultiplier(),
 		ThreatMultiplier: 1,
 		BonusCoefficient: 1,
+		MaxRange:         core.MaxMeleeRange,
 
 		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
 			baseDamage := 3306.0/1.9 +
 				spell.Unit.MHWeaponDamage(sim, spell.MeleeAttackPower())
 
-			result := spell.CalcAndDealDamage(sim, target, baseDamage, spell.OutcomeMeleeSpecialHitAndCrit)
+			result := spell.CalcAndDealDamage(sim, target, baseDamage, spell.OutcomeMeleeWeaponSpecialHitAndCrit)
 
 			if result.Landed() {
 				mangleAuras.Get(target).Activate(sim)
@@ -91,12 +92,13 @@ func (druid *Druid) registerMangleCatSpell() {
 		CritMultiplier:   druid.DefaultMeleeCritMultiplier(),
 		ThreatMultiplier: 1,
 		BonusCoefficient: 1,
+		MaxRange:         core.MaxMeleeRange,
 
 		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
 			baseDamage := 302.0/5.4 +
 				spell.Unit.MHWeaponDamage(sim, spell.MeleeAttackPower())
 
-			result := spell.CalcAndDealDamage(sim, target, baseDamage, spell.OutcomeMeleeSpecialHitAndCrit)
+			result := spell.CalcAndDealDamage(sim, target, baseDamage, spell.OutcomeMeleeWeaponSpecialHitAndCrit)
 
 			if result.Landed() {
 				druid.AddComboPoints(sim, 1, spell.ComboPointMetrics())
@@ -106,9 +108,27 @@ func (druid *Druid) registerMangleCatSpell() {
 				if hasBloodletting {
 					druid.ApplyBloodletting(target)
 				}
+
+				// 4pT11
+				if druid.StrengthOfThePantherAura != nil {
+					aura := druid.StrengthOfThePantherAura
+
+					if aura.IsActive() {
+						aura.Refresh(sim)
+						aura.AddStack(sim)
+					} else {
+						aura.Activate(sim)
+						aura.SetStacks(sim, 1)
+					}
+				}
 			} else {
 				spell.IssueRefund(sim)
 			}
+		},
+
+		ExpectedInitialDamage: func(sim *core.Simulation, target *core.Unit, spell *core.Spell, _ bool) *core.SpellResult {
+			baseDamage := 302.0/5.4 + spell.Unit.AutoAttacks.MH().CalculateAverageWeaponDamage(spell.MeleeAttackPower())
+			return spell.CalcDamage(sim, target, baseDamage, spell.OutcomeExpectedMeleeWeaponSpecialHitAndCrit)
 		},
 
 		RelatedAuras: []core.AuraArray{mangleAuras},

@@ -205,6 +205,7 @@ message IconData {
 	int32 id = 1;
 	string name = 2;
 	string icon = 3;
+	bool has_buff = 4;
 }
 
 message GlyphID {
@@ -277,6 +278,7 @@ message SimSettings {
 	bool show_threat_metrics = 4;
 	bool show_healing_metrics = 7;
 	bool show_experimental = 5;
+	bool show_quick_swap = 12;
 	bool show_ep_values = 11;
 	string language = 9;
 	Faction faction = 6;

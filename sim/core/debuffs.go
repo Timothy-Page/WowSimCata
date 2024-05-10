@@ -105,8 +105,8 @@ func applyDebuffEffects(target *Unit, targetIdx int, debuffs *proto.Debuffs, rai
 		}, raid)
 	}
 
-	if debuffs.AcidSpit && targetIdx == 0 {
-		aura := AcidSpitAura(target)
+	if debuffs.CorrosiveSpit && targetIdx == 0 {
+		aura := CorrosiveSpitAura(target)
 		ScheduledMajorArmorAura(aura, PeriodicActionOptions{
 			Period:          time.Second * 10,
 			NumTicks:        3,
@@ -207,7 +207,7 @@ func JudgementOfLightAura(target *Unit) *Aura {
 func CurseOfElementsAura(target *Unit) *Aura {
 	aura := target.GetOrRegisterAura(Aura{
 		Label:    "Curse of Elements",
-		ActionID: ActionID{SpellID: 47865},
+		ActionID: ActionID{SpellID: 1490},
 		Duration: time.Minute * 5,
 		OnGain: func(aura *Aura, sim *Simulation) {
 			aura.Unit.AddStatsDynamic(sim, stats.Stats{stats.ArcaneResistance: -215, stats.FireResistance: -215, stats.FrostResistance: -215, stats.ShadowResistance: -215, stats.NatureResistance: -215})
@@ -623,10 +623,10 @@ func PhysDamageReductionEffect(aura *Aura, dmgReduction float64) *ExclusiveEffec
 	return aura.NewExclusiveEffect("PhysDamageReduction", false, ExclusiveEffect{
 		Priority: dmgReduction,
 		OnGain: func(ee *ExclusiveEffect, sim *Simulation) {
-			ee.Aura.Unit.PseudoStats.SchoolDamageDealtMultiplier[SpellSchoolPhysical] *= reductionMult
+			ee.Aura.Unit.PseudoStats.SchoolDamageDealtMultiplier[stats.SchoolIndexPhysical] *= reductionMult
 		},
 		OnExpire: func(ee *ExclusiveEffect, sim *Simulation) {
-			ee.Aura.Unit.PseudoStats.SchoolDamageDealtMultiplier[SpellSchoolPhysical] /= reductionMult
+			ee.Aura.Unit.PseudoStats.SchoolDamageDealtMultiplier[stats.SchoolIndexPhysical] /= reductionMult
 		},
 	})
 }
@@ -806,23 +806,5 @@ func CrystalYieldAura(target *Unit) *Aura {
 		OnExpire: func(aura *Aura, sim *Simulation) {
 			aura.Unit.stats[stats.Armor] += 200
 		},
-	})
-}
-
-func SporeCloudAura(target *Unit) *Aura {
-	return target.GetOrRegisterAura(Aura{
-		Label:    "Spore Cloud",
-		ActionID: ActionID{SpellID: 53598},
-		Duration: time.Second * 10,
-	})
-}
-
-// TODO: Hunter Spec uses this but the ability no longer exists
-// Need to fixup pet abilities
-func StingAura(target *Unit) *Aura {
-	return target.GetOrRegisterAura(Aura{
-		Label:    "Sting",
-		ActionID: ActionID{SpellID: 56631},
-		Duration: time.Second * 10,
 	})
 }

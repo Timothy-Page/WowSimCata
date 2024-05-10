@@ -1,41 +1,50 @@
+import { hasTouch } from '../shared/bootstrap_overrides';
+import Toast from './components/toast';
 import { getBrowserLanguageCode, setLanguageCode } from './constants/lang.js';
 import * as OtherConstants from './constants/other.js';
 import { Encounter } from './encounter.js';
 import { Player, UnitMetadata } from './player.js';
-import { BulkSettings, BulkSimRequest, BulkSimResult, ComputeStatsRequest , Raid as RaidProto , RaidSimRequest, RaidSimResult , SimOptions , StatWeightsRequest, StatWeightsResult } from './proto/api.js';
+import {
+	BulkSettings,
+	BulkSimRequest,
+	BulkSimResult,
+	ComputeStatsRequest,
+	Raid as RaidProto,
+	RaidSimRequest,
+	RaidSimResult,
+	SimOptions,
+	StatWeightsRequest,
+	StatWeightsResult,
+} from './proto/api.js';
 import {
 	ArmorType,
 	Faction,
 	Profession,
-PseudoStat,
+	PseudoStat,
 	RangedWeaponType,
 	SimDatabase,
 	Spec,
-	Stat, 	UnitReference,
+	Stat,
+	UnitReference,
 	UnitReference_Type as UnitType,
 	WeaponType,
 } from './proto/common.js';
-import {
-	DatabaseFilters,
-	RaidFilterOption,
-	SimSettings as SimSettingsProto,
-	SourceFilterOption,
-} from './proto/ui.js';
+import { DatabaseFilters, RaidFilterOption, SimSettings as SimSettingsProto, SourceFilterOption } from './proto/ui.js';
 import { Database } from './proto_utils/database.js';
 import { SimResult } from './proto_utils/sim_result.js';
 import { Raid } from './raid.js';
 import { EventID, TypedEvent } from './typed_event.js';
 import { getEnumValues } from './utils.js';
-import { WorkerPool } from './worker_pool.js';
+import { WorkerPool, WorkerProgressCallback } from './worker_pool.js';
 
 export type RaidSimData = {
-	request: RaidSimRequest,
-	result: RaidSimResult,
+	request: RaidSimRequest;
+	result: RaidSimResult;
 };
 
 export type StatWeightsData = {
-	request: StatWeightsRequest,
-	result: StatWeightsResult,
+	request: StatWeightsRequest;
+	result: StatWeightsResult;
 };
 
 export enum SimSettingCategories {
@@ -62,6 +71,7 @@ export class Sim {
 	private showThreatMetrics = false;
 	private showHealingMetrics = false;
 	private showExperimental = false;
+	private showQuickSwap = false;
 	private showEPValues = false;
 	private language = '';
 
@@ -80,6 +90,7 @@ export class Sim {
 	readonly showThreatMetricsChangeEmitter = new TypedEvent<void>();
 	readonly showHealingMetricsChangeEmitter = new TypedEvent<void>();
 	readonly showExperimentalChangeEmitter = new TypedEvent<void>();
+	readonly showQuickSwapChangeEmitter = new TypedEvent<void>();
 	readonly showEPValuesChangeEmitter = new TypedEvent<void>();
 	readonly languageChangeEmitter = new TypedEvent<void>();
 	readonly crashEmitter = new TypedEvent<SimError>();
@@ -105,7 +116,7 @@ export class Sim {
 	private lastUsedRngSeed = 0;
 
 	// These callbacks are needed so we can apply BuffBot modifications automatically before sending requests.
-	private modifyRaidProto: ((raidProto: RaidProto) => void) = () => { };
+	private modifyRaidProto: (raidProto: RaidProto) => void = () => {};
 
 	constructor() {
 		this.workerPool = new WorkerPool(1);
@@ -125,15 +136,12 @@ export class Sim {
 			this.showThreatMetricsChangeEmitter,
 			this.showHealingMetricsChangeEmitter,
 			this.showExperimentalChangeEmitter,
+			this.showQuickSwapChangeEmitter,
 			this.showEPValuesChangeEmitter,
 			this.languageChangeEmitter,
 		]);
 
-		this.changeEmitter = TypedEvent.onAny([
-			this.settingsChangeEmitter,
-			this.raid.changeEmitter,
-			this.encounter.changeEmitter,
-		]);
+		this.changeEmitter = TypedEvent.onAny([this.settingsChangeEmitter, this.raid.changeEmitter, this.encounter.changeEmitter]);
 
 		TypedEvent.onAny([this.raid.changeEmitter, this.encounter.changeEmitter]).on(eventID => this.updateCharacterStats(eventID));
 	}
@@ -203,7 +211,7 @@ export class Sim {
 		});
 	}
 
-	async runBulkSim(bulkSettings: BulkSettings, bulkItemsDb: SimDatabase, onProgress: Function): Promise<BulkSimResult> {
+	async runBulkSim(bulkSettings: BulkSettings, bulkItemsDb: SimDatabase, onProgress: WorkerProgressCallback): Promise<BulkSimResult | null> {
 		if (this.raid.isEmpty()) {
 			throw new Error('Raid is empty! Try adding some players first.');
 		} else if (this.encounter.targets.length < 1) {
@@ -233,52 +241,65 @@ export class Sim {
 
 		this.bulkSimStartEmitter.emit(TypedEvent.nextEventID(), request);
 
-		const result = await this.workerPool.bulkSimAsync(request, onProgress);
-		if (result.errorResult != "") {
-			throw new SimError(result.errorResult);
-		}
+		try {
+			const result = await this.workerPool.bulkSimAsync(request, onProgress);
+			if (result.errorResult != '') {
+				throw new SimError(result.errorResult);
+			}
 
-		this.bulkSimResultEmitter.emit(TypedEvent.nextEventID(), result);
-		return result;
+			this.bulkSimResultEmitter.emit(TypedEvent.nextEventID(), result);
+			return result;
+		} catch (error) {
+			if (error instanceof SimError) throw error;
+			throw new Error('Something went wrong running your raid sim. Reload the page and try again.');
+		}
 	}
 
-	async runRaidSim(eventID: EventID, onProgress: Function): Promise<SimResult> {
+	async runRaidSim(eventID: EventID, onProgress: WorkerProgressCallback): Promise<SimResult | null> {
 		if (this.raid.isEmpty()) {
 			throw new Error('Raid is empty! Try adding some players first.');
 		} else if (this.encounter.targets.length < 1) {
 			throw new Error('Encounter has no targets! Try adding some targets first.');
 		}
+		try {
+			await this.waitForInit();
 
-		await this.waitForInit();
+			const request = this.makeRaidSimRequest(false);
 
-		const request = this.makeRaidSimRequest(false);
-
-		const result = await this.workerPool.raidSimAsync(request, onProgress);
-		if (result.errorResult != "") {
-			throw new SimError(result.errorResult);
+			const result = await this.workerPool.raidSimAsync(request, onProgress);
+			if (result.errorResult != '') {
+				throw new SimError(result.errorResult);
+			}
+			const simResult = await SimResult.makeNew(request, result);
+			this.simResultEmitter.emit(eventID, simResult);
+			return simResult;
+		} catch (error) {
+			if (error instanceof SimError) throw error;
+			throw new Error('Something went wrong running your raid sim. Reload the page and try again.');
 		}
-		const simResult = await SimResult.makeNew(request, result);
-		this.simResultEmitter.emit(eventID, simResult);
-		return simResult;
 	}
 
-	async runRaidSimWithLogs(eventID: EventID): Promise<SimResult> {
+	async runRaidSimWithLogs(eventID: EventID): Promise<SimResult | null> {
 		if (this.raid.isEmpty()) {
 			throw new Error('Raid is empty! Try adding some players first.');
 		} else if (this.encounter.targets.length < 1) {
 			throw new Error('Encounter has no targets! Try adding some targets first.');
 		}
+		try {
+			await this.waitForInit();
 
-		await this.waitForInit();
-
-		const request = this.makeRaidSimRequest(true);
-		const result = await this.workerPool.raidSimAsync(request, () => { });
-		if (result.errorResult != "") {
-			throw new SimError(result.errorResult);
+			const request = this.makeRaidSimRequest(true);
+			const result = await this.workerPool.raidSimAsync(request, () => {});
+			if (result.errorResult != '') {
+				throw new SimError(result.errorResult);
+			}
+			const simResult = await SimResult.makeNew(request, result);
+			this.simResultEmitter.emit(eventID, simResult);
+			return simResult;
+		} catch (error) {
+			if (error instanceof SimError) throw error;
+			throw new Error('Something went wrong running your raid sim. Reload the page and try again.');
 		}
-		const simResult = await SimResult.makeNew(request, result);
-		this.simResultEmitter.emit(eventID, simResult);
-		return simResult;
 	}
 
 	// This should be invoked internally whenever stats might have changed.
@@ -299,16 +320,17 @@ export class Sim {
 			raid: this.getModifiedRaidProto(),
 			encounter: this.encounter.toProto(),
 		});
+
 		const result = await this.workerPool.computeStats(req);
 
-		if (result.errorResult != "") {
+		if (result.errorResult != '') {
 			this.crashEmitter.emit(eventID, new SimError(result.errorResult));
 			return;
 		}
 
 		TypedEvent.freezeAllAndDo(async () => {
-			const playerUpdatePromises = result.raidStats!.parties
-				.map((partyStats, partyIndex) =>
+			const playerUpdatePromises = result
+				.raidStats!.parties.map((partyStats, partyIndex) =>
 					partyStats.players.map((playerStats, playerIndex) => {
 						const player = players[partyIndex * 5 + playerIndex];
 						if (player) {
@@ -317,7 +339,8 @@ export class Sim {
 						} else {
 							return null;
 						}
-					}))
+					}),
+				)
 				.flat()
 				.filter(p => p != null) as Array<Promise<boolean>>;
 
@@ -330,7 +353,13 @@ export class Sim {
 		});
 	}
 
-	async statWeights(player: Player<any>, epStats: Array<Stat>, epPseudoStats: Array<PseudoStat>, epReferenceStat: Stat, onProgress: Function): Promise<StatWeightsResult> {
+	async statWeights(
+		player: Player<any>,
+		epStats: Array<Stat>,
+		epPseudoStats: Array<PseudoStat>,
+		epReferenceStat: Stat,
+		onProgress: WorkerProgressCallback,
+	): Promise<StatWeightsResult | null> {
 		if (this.raid.isEmpty()) {
 			throw new Error('Raid is empty! Try adding some players first.');
 		} else if (this.encounter.targets.length < 1) {
@@ -343,7 +372,10 @@ export class Sim {
 			console.warn('Trying to get stat weights without a party!');
 			return StatWeightsResult.create();
 		} else {
-			const tanks = this.raid.getTanks().map(tank => tank.index).includes(player.getRaidIndex())
+			const tanks = this.raid
+				.getTanks()
+				.map(tank => tank.index)
+				.includes(player.getRaidIndex())
 				? [UnitReference.create({ type: UnitType.Player, index: 0 })]
 				: [];
 			const request = StatWeightsRequest.create({
@@ -363,12 +395,16 @@ export class Sim {
 				pseudoStatsToWeigh: epPseudoStats,
 				epReferenceStat: epReferenceStat,
 			});
-			const result = await this.workerPool.statWeightsAsync(request, onProgress);
-			return result;
+			try {
+				const result = await this.workerPool.statWeightsAsync(request, onProgress);
+				return result;
+			} catch {
+				throw new Error('Something went wrong calculating your stat weights. Reload the page and try again.');
+			}
 		}
 	}
 
-	getUnitMetadata(ref: UnitReference|undefined, contextPlayer: Player<any>|null, defaultRef: UnitReference): UnitMetadata|undefined {
+	getUnitMetadata(ref: UnitReference | undefined, contextPlayer: Player<any> | null, defaultRef: UnitReference): UnitMetadata | undefined {
 		if (!ref || ref.type == UnitType.Unknown) {
 			return this.getUnitMetadata(defaultRef, contextPlayer, defaultRef);
 		} else if (ref.type == UnitType.Player) {
@@ -394,7 +430,7 @@ export class Sim {
 		return this.phase;
 	}
 	setPhase(eventID: EventID, newPhase: number) {
-		if (newPhase != this.phase && newPhase > 0) {
+		if (newPhase != this.phase) {
 			this.phase = newPhase;
 			this.phaseChangeEmitter.emit(eventID);
 		}
@@ -491,6 +527,16 @@ export class Sim {
 		}
 	}
 
+	getShowQuickSwap(): boolean {
+		return !hasTouch() && this.showQuickSwap;
+	}
+	setShowQuickSwap(eventID: EventID, newShowQuickSwap: boolean) {
+		if (newShowQuickSwap != this.showQuickSwap) {
+			this.showQuickSwap = newShowQuickSwap;
+			this.showQuickSwapChangeEmitter.emit(eventID);
+		}
+	}
+
 	getShowEPValues(): boolean {
 		return this.showEPValues;
 	}
@@ -555,6 +601,7 @@ export class Sim {
 			showThreatMetrics: this.getShowThreatMetrics(),
 			showHealingMetrics: this.getShowHealingMetrics(),
 			showExperimental: this.getShowExperimental(),
+			showQuickSwap: this.getShowQuickSwap(),
 			showEpValues: this.getShowEPValues(),
 			language: this.getLanguage(),
 			faction: this.getFaction(),
@@ -571,9 +618,10 @@ export class Sim {
 			this.setShowThreatMetrics(eventID, proto.showThreatMetrics);
 			this.setShowHealingMetrics(eventID, proto.showHealingMetrics);
 			this.setShowExperimental(eventID, proto.showExperimental);
+			this.setShowQuickSwap(eventID, proto.showQuickSwap);
 			this.setShowEPValues(eventID, proto.showEpValues);
 			this.setLanguage(eventID, proto.language);
-			this.setFaction(eventID, proto.faction || Faction.Alliance)
+			this.setFaction(eventID, proto.faction || Faction.Alliance);
 
 			const filters = proto.filters || Sim.defaultFilters();
 			if (filters.armorTypes.length == 0) {
@@ -596,17 +644,20 @@ export class Sim {
 	}
 
 	applyDefaults(eventID: EventID, isTankSim: boolean, isHealingSim: boolean) {
-		this.fromProto(eventID, SimSettingsProto.create({
-			iterations: 3000,
-			phase: OtherConstants.CURRENT_PHASE,
-			faction: Faction.Alliance,
-			showDamageMetrics: !isHealingSim,
-			showThreatMetrics: isTankSim,
-			showHealingMetrics: isHealingSim,
-			language: this.getLanguage(), // Don't change language.
-			filters: Sim.defaultFilters(),
-			showEpValues: false,
-		}));
+		this.fromProto(
+			eventID,
+			SimSettingsProto.create({
+				iterations: 3000,
+				phase: OtherConstants.CURRENT_PHASE,
+				faction: Faction.Alliance,
+				showDamageMetrics: !isHealingSim,
+				showThreatMetrics: isTankSim,
+				showHealingMetrics: isHealingSim,
+				language: this.getLanguage(), // Don't change language.
+				filters: Sim.defaultFilters(),
+				showEpValues: false,
+			}),
+		);
 	}
 
 	static defaultFilters(): DatabaseFilters {

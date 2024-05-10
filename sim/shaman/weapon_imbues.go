@@ -129,9 +129,10 @@ func (shaman *Shaman) RegisterWindfuryImbue(procMask core.ProcMask) {
 // TODO: Not sure on the base damage here wowhead does not seem to be correct. in testing with 1.3 weapon and 129 sp it was 109 damage
 func (shaman *Shaman) newFlametongueImbueSpell(weapon *core.Item) *core.Spell {
 	return shaman.RegisterSpell(core.SpellConfig{
-		ActionID:    core.ActionID{SpellID: int32(8024)},
-		SpellSchool: core.SpellSchoolFire,
-		ProcMask:    core.ProcMaskWeaponProc,
+		ActionID:       core.ActionID{SpellID: int32(8024)},
+		SpellSchool:    core.SpellSchoolFire,
+		ProcMask:       core.ProcMaskWeaponProc,
+		ClassSpellMask: SpellMaskFlametongueWeapon,
 
 		DamageMultiplier: 1,
 		CritMultiplier:   shaman.DefaultSpellCritMultiplier(),
@@ -249,7 +250,8 @@ func (shaman *Shaman) newFrostbrandImbueSpell() *core.Spell {
 		ThreatMultiplier: 1,
 		BonusCoefficient: 0.1,
 		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
-			spell.CalcAndDealDamage(sim, target, 612, spell.OutcomeMagicHitAndCrit)
+			baseDamage := shaman.ClassSpellScaling * 0.60900002718 //spell id 8034
+			spell.CalcAndDealDamage(sim, target, baseDamage, spell.OutcomeMagicHitAndCrit)
 		},
 	})
 }
@@ -317,7 +319,7 @@ func (shaman *Shaman) newEarthlivingImbueSpell() *core.Spell {
 			NumberOfTicks: 4,
 			TickLength:    time.Second * 3,
 			OnSnapshot: func(sim *core.Simulation, target *core.Unit, dot *core.Dot, _ bool) {
-				dot.SnapshotBaseDamage = 577*glyphBonus + (0.038 * dot.Spell.HealingPower(target))
+				dot.SnapshotBaseDamage = (shaman.ClassSpellScaling*0.57400000095 + (0.038 * dot.Spell.HealingPower(target))) * glyphBonus
 				dot.SnapshotAttackerMultiplier = dot.Spell.CasterHealingMultiplier()
 			},
 			OnTick: func(sim *core.Simulation, target *core.Unit, dot *core.Dot) {

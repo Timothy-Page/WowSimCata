@@ -25,7 +25,6 @@ import { Stats } from '../../core/proto_utils/stats';
 import * as HunterInputs from '../inputs';
 import * as MMInputs from './inputs';
 import * as Presets from './presets';
-
 const SPEC_CONFIG = registerSpecConfig(Spec.SpecMarksmanshipHunter, {
 	cssClass: 'marksmanship-hunter-sim-ui',
 	cssScheme: 'hunter',
@@ -146,8 +145,8 @@ const SPEC_CONFIG = registerSpecConfig(Spec.SpecMarksmanshipHunter, {
 	otherInputs: {
 		inputs: [
 			HunterInputs.PetUptime(),
-			HunterInputs.TimeToTrapWeaveMs(),
 			OtherInputs.InputDelay,
+			OtherInputs.DistanceFromTarget,
 			OtherInputs.TankAssignment,
 			OtherInputs.InFrontOfTarget,
 			OtherInputs.DarkIntentUptime,
@@ -249,16 +248,16 @@ const SPEC_CONFIG = registerSpecConfig(Spec.SpecMarksmanshipHunter, {
 			consumes: Presets.DefaultConsumes,
 			defaultFactionRaces: {
 				[Faction.Unknown]: Race.RaceUnknown,
-				[Faction.Alliance]: Race.RaceNightElf,
-				[Faction.Horde]: Race.RaceOrc,
+				[Faction.Alliance]: Race.RaceWorgen,
+				[Faction.Horde]: Race.RaceTroll,
 			},
 			defaultGear: {
 				[Faction.Unknown]: {},
 				[Faction.Alliance]: {
-					1: Presets.MM_P1_PRESET.gear,
+					1: Presets.MM_PRERAID_PRESET.gear,
 				},
 				[Faction.Horde]: {
-					1: Presets.MM_P1_PRESET.gear,
+					1: Presets.MM_PRERAID_PRESET.gear,
 				},
 			},
 			otherDefaults: Presets.OtherDefaults,

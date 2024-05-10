@@ -28,7 +28,8 @@ func TestMM(t *testing.T) {
 			core.GetAplRotation("../../../ui/hunter/marksmanship/apls", "mm_advanced"),
 		},
 
-		ItemFilter: ItemFilter,
+		ItemFilter:         ItemFilter,
+		StartingDistance:   5.1,
 	}))
 }
 

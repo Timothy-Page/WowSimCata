@@ -105,6 +105,7 @@ func (shaman *Shaman) ApplyTalents() {
 	shaman.applyFlurry()
 	shaman.applyMaelstromWeapon()
 	shaman.applySearingFlames()
+	shaman.applyTotemicFocus()
 
 	if shaman.Talents.FeralSpirit {
 		shaman.registerFeralSpirit()
@@ -122,6 +123,9 @@ func (shaman *Shaman) applyElementalFocus() {
 	if !shaman.Talents.ElementalFocus {
 		return
 	}
+
+	var triggeringSpell *core.Spell
+	var triggerTime time.Duration
 
 	affectedSpells := SpellMaskLightningBolt | SpellMaskChainLightning | SpellMaskLavaBurst | SpellMaskFireNova | SpellMaskEarthShock | SpellMaskFlameShock | SpellMaskFrostShock
 	costReductionMod := shaman.AddDynamicMod(core.SpellModConfig{
@@ -164,6 +168,9 @@ func (shaman *Shaman) applyElementalFocus() {
 			if !spell.Flags.Matches(SpellFlagShock|SpellFlagFocusable) || (spell.ClassSpellMask&(SpellMaskOverload|SpellMaskThunderstorm) != 0) {
 				return
 			}
+			if spell == triggeringSpell && sim.CurrentTime == triggerTime {
+				return
+			}
 			aura.RemoveStack(sim)
 		},
 	})
@@ -181,6 +188,8 @@ func (shaman *Shaman) applyElementalFocus() {
 			if !result.Outcome.Matches(core.OutcomeCrit) {
 				return
 			}
+			triggeringSpell = spell
+			triggerTime = sim.CurrentTime
 			clearcastingAura.Activate(sim)
 			clearcastingAura.SetStacks(sim, maxStacks)
 		},
@@ -281,11 +290,13 @@ func (shaman *Shaman) applyFulmination() {
 				GCD:      0,
 			},
 		},
+		MetricSplits: 7,
 
 		DamageMultiplier: 1,
 		CritMultiplier:   shaman.DefaultSpellCritMultiplier(),
 		ApplyEffects: func(sim *core.Simulation, target *core.Unit, spell *core.Spell) {
-			totalDamage := (390.7 + 0.267*spell.SpellPower()) * (float64(shaman.LightningShieldAura.GetStacks()) - 3)
+			spell.SetMetricsSplit(shaman.LightningShieldAura.GetStacks() - 3)
+			totalDamage := (shaman.ClassSpellScaling*0.38899999857 + 0.267*spell.SpellPower()) * (float64(shaman.LightningShieldAura.GetStacks()) - 3)
 			result := spell.CalcDamage(sim, target, totalDamage, spell.OutcomeMagicHitAndCrit)
 			spell.DealDamage(sim, result)
 		},
@@ -645,6 +656,15 @@ func (shaman *Shaman) applySearingFlames() {
 		},
 	})
 
+}
+
+func (shaman *Shaman) applyTotemicFocus() {
+	if shaman.Talents.TotemicFocus == 0 {
+		return
+	}
+
+	shaman.FireElemental.maxFireBlastCasts = int32(float64(shaman.FireElemental.maxFireBlastCasts) * (1.0 + 0.20*float64(shaman.Talents.TotemicFocus)))
+	shaman.FireElemental.maxFireNovaCasts = int32(float64(shaman.FireElemental.maxFireNovaCasts) * (1.0 + 0.20*float64(shaman.Talents.TotemicFocus)))
 }
 
 func (shaman *Shaman) registerManaTideTotemCD() {

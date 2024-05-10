@@ -1,9 +1,11 @@
-import { Tooltip } from 'bootstrap';
+import tippy, { ReferenceElement as TippyReferenceElement } from 'tippy.js';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { element } from 'tsx-vanilla';
 
 import { SimUI } from '../sim_ui';
 import { Component } from './component';
+import { Exporter } from './exporters';
+import { Importer } from './importers';
 import { SettingsMenu } from './settings_menu';
 import { SimTab } from './sim_tab';
 import { SocialLinks } from './social_links';
@@ -23,7 +25,7 @@ export class SimHeader extends Component {
 
 	private simTabsContainer: HTMLElement;
 	private simToolbar: HTMLElement;
-	private knownIssuesLink: HTMLElement;
+	private knownIssuesLink: TippyReferenceElement<HTMLElement>;
 	private knownIssuesContent: HTMLElement;
 
 	constructor(parentElem: HTMLElement, simUI: SimUI) {
@@ -83,16 +85,15 @@ export class SimHeader extends Component {
 		this.simTabsContainer.appendChild(tab.navItem);
 	}
 
-	addImportLink(label: string, onClick: (parent: HTMLElement) => void, hideInRaidSim?: boolean) {
-		this.addImportExportLink('import-dropdown', label, onClick, hideInRaidSim);
+	addImportLink(label: string, importer: Importer, hideInRaidSim?: boolean) {
+		this.addImportExportLink('import-dropdown', label, importer, hideInRaidSim);
 	}
-	addExportLink(label: string, onClick: (parent: HTMLElement) => void, hideInRaidSim?: boolean) {
-		this.addImportExportLink('export-dropdown', label, onClick, hideInRaidSim);
+	addExportLink(label: string, exporter: Exporter, hideInRaidSim?: boolean) {
+		this.addImportExportLink('export-dropdown', label, exporter, hideInRaidSim);
 	}
-	private addImportExportLink(cssClass: string, label: string, onClick: (parent: HTMLElement) => void, hideInRaidSim?: boolean) {
+	private addImportExportLink(cssClass: string, label: string, importerExporter: Importer | Exporter, _hideInRaidSim?: boolean) {
 		const dropdownElem = this.rootElem.getElementsByClassName(cssClass)[0] as HTMLElement;
 		const menuElem = dropdownElem.getElementsByClassName('dropdown-menu')[0] as HTMLElement;
-
 		const itemElem = (
 			<li>
 				<a
@@ -107,7 +108,7 @@ export class SimHeader extends Component {
 		);
 
 		const linkElem = itemElem.children[0];
-		linkElem.addEventListener('click', () => onClick(menuElem));
+		linkElem.addEventListener('click', () => importerExporter.open());
 		menuElem.appendChild(itemElem);
 	}
 
@@ -131,29 +132,28 @@ export class SimHeader extends Component {
 		}
 
 		if (args.tooltip) {
-			new Tooltip(link, {
+			tippy(link, {
+				content: args.tooltip,
 				placement: 'bottom',
-				title: args.tooltip,
-				html: true,
 			});
 		}
 
 		return args.parent.appendChild(item) as HTMLElement;
 	}
 
-	private addKnownIssuesLink(): HTMLElement {
+	private addKnownIssuesLink() {
 		return this.addToolbarLink({
 			parent: this.simToolbar,
 			text: 'Known Issues',
 			tooltip: this.knownIssuesContent,
 			classes: 'known-issues link-danger hide',
-		}).children[0] as HTMLElement;
+		}).children[0] as TippyReferenceElement<HTMLElement>;
 	}
 
 	addKnownIssue(issue: string) {
 		this.knownIssuesContent.appendChild(<li>{issue}</li>);
 		this.knownIssuesLink.classList.remove('hide');
-		Tooltip.getInstance(this.knownIssuesLink)?.setContent({ '.tooltip-inner': this.knownIssuesContent });
+		this.knownIssuesLink._tippy?.setContent(this.knownIssuesContent);
 	}
 
 	private addBugReportLink() {
@@ -200,12 +200,13 @@ export class SimHeader extends Component {
 	}
 
 	private addSimOptionsLink() {
+		const settingsMenu = new SettingsMenu(this.simUI.rootElem, this.simUI);
 		this.addToolbarLink({
 			parent: this.simToolbar,
 			icon: 'fas fa-cog fa-lg',
 			tooltip: 'Show Sim Options',
 			classes: 'sim-options',
-			onclick: () => new SettingsMenu(this.simUI.rootElem, this.simUI),
+			onclick: () => settingsMenu.open(),
 		});
 	}
 

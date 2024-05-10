@@ -1,14 +1,15 @@
-import * as BuffDebuffInputs from '../../core/components/inputs/buffs_debuffs.js';
-import * as OtherInputs from '../../core/components/other_inputs.js';
-import { IndividualSimUI, registerSpecConfig } from '../../core/individual_sim_ui.js';
-import { Player } from '../../core/player.js';
+import * as BuffDebuffInputs from '../../core/components/inputs/buffs_debuffs';
+import * as OtherInputs from '../../core/components/other_inputs';
+import * as Mechanics from '../../core/constants/mechanics';
+import { IndividualSimUI, registerSpecConfig } from '../../core/individual_sim_ui';
+import { Player } from '../../core/player';
 import { PlayerClasses } from '../../core/player_classes';
-import { APLRotation } from '../../core/proto/apl.js';
-import { Faction, Race, Spec, Stat } from '../../core/proto/common.js';
-import { Stats } from '../../core/proto_utils/stats.js';
-import * as DruidInputs from '../inputs.js';
-import * as BalanceInputs from './inputs.js';
-import * as Presets from './presets.js';
+import { APLRotation } from '../../core/proto/apl';
+import { Faction, Race, Spec, Stat } from '../../core/proto/common';
+import { Stats } from '../../core/proto_utils/stats';
+import * as DruidInputs from '../inputs';
+import * as BalanceInputs from './inputs';
+import * as Presets from './presets';
 
 const SPEC_CONFIG = registerSpecConfig(Spec.SpecBalanceDruid, {
 	cssClass: 'balance-druid-sim-ui',
@@ -24,7 +25,6 @@ const SPEC_CONFIG = registerSpecConfig(Spec.SpecBalanceDruid, {
 		Stat.StatSpellHit,
 		Stat.StatSpellCrit,
 		Stat.StatSpellHaste,
-		Stat.StatMP5,
 		Stat.StatMastery,
 	],
 	// Reference stat against which to calculate EP. I think all classes use either spell power or attack power.
@@ -32,6 +32,7 @@ const SPEC_CONFIG = registerSpecConfig(Spec.SpecBalanceDruid, {
 	// Which stats to display in the Character Stats section, at the bottom of the left-hand sidebar.
 	displayStats: [
 		Stat.StatHealth,
+		Stat.StatMana,
 		Stat.StatStamina,
 		Stat.StatIntellect,
 		Stat.StatSpirit,
@@ -39,13 +40,21 @@ const SPEC_CONFIG = registerSpecConfig(Spec.SpecBalanceDruid, {
 		Stat.StatSpellHit,
 		Stat.StatSpellCrit,
 		Stat.StatSpellHaste,
-		Stat.StatMP5,
 		Stat.StatMastery,
 	],
 
+	modifyDisplayStats: (player: Player<Spec.SpecBalanceDruid>) => {
+		let stats = new Stats();
+		stats = stats.addStat(Stat.StatSpellCrit, player.getTalents().naturesMajesty * 2 * Mechanics.SPELL_CRIT_RATING_PER_CRIT_CHANCE);
+
+		return {
+			talents: stats,
+		};
+	},
+
 	defaults: {
 		// Default equipped gear.
-		gear: Presets.P3_PRESET_HORDE.gear,
+		gear: Presets.PreraidPresetGear.gear,
 		// Default EP weights for sorting gear in the gear picker.
 		epWeights: Stats.fromMap({
 			[Stat.StatIntellect]: 0.43,
@@ -53,12 +62,12 @@ const SPEC_CONFIG = registerSpecConfig(Spec.SpecBalanceDruid, {
 			[Stat.StatSpellPower]: 1,
 			[Stat.StatSpellCrit]: 0.82,
 			[Stat.StatSpellHaste]: 0.8,
-			[Stat.StatMP5]: 0.0,
+			[Stat.StatMastery]: 0.0,
 		}),
 		// Default consumes settings.
 		consumes: Presets.DefaultConsumes,
 		// Default talents.
-		talents: Presets.Phase3Talents.data,
+		talents: Presets.StandardTalents.data,
 		// Default spec-specific settings.
 		specOptions: Presets.DefaultOptions,
 		// Default raid/party buffs settings.
@@ -91,28 +100,20 @@ const SPEC_CONFIG = registerSpecConfig(Spec.SpecBalanceDruid, {
 
 	presets: {
 		// Preset talents that the user can quickly select.
-		talents: [Presets.Phase1Talents, Presets.Phase2Talents, Presets.Phase3Talents, Presets.Phase4Talents],
-		rotations: [Presets.ROTATION_PRESET_P3_APL, Presets.ROTATION_PRESET_P4_FOCUS_APL, Presets.ROTATION_PRESET_P4_STARFIRE_APL],
+		talents: [Presets.StandardTalents],
+		rotations: [Presets.PresetRotationDefault],
 		// Preset gear configurations that the user can quickly select.
-		gear: [
-			Presets.PRERAID_PRESET,
-			Presets.P1_PRESET,
-			Presets.P2_PRESET,
-			Presets.P3_PRESET_HORDE,
-			Presets.P3_PRESET_ALLI,
-			Presets.P4_PRESET_HORDE,
-			Presets.P4_PRESET_ALLI,
-		],
+		gear: [ Presets.PreraidPresetGear]
 	},
 
 	autoRotation: (_player: Player<Spec.SpecBalanceDruid>): APLRotation => {
-		return Presets.ROTATION_PRESET_P3_APL.rotation.rotation!;
+		return Presets.PresetRotationDefault.rotation.rotation!;
 	},
 
 	raidSimPresets: [
 		{
 			spec: Spec.SpecBalanceDruid,
-			talents: Presets.Phase2Talents.data,
+			talents: Presets.StandardTalents.data,
 			specOptions: Presets.DefaultOptions,
 			consumes: Presets.DefaultConsumes,
 			otherDefaults: Presets.OtherDefaults,
@@ -124,16 +125,10 @@ const SPEC_CONFIG = registerSpecConfig(Spec.SpecBalanceDruid, {
 			defaultGear: {
 				[Faction.Unknown]: {},
 				[Faction.Alliance]: {
-					1: Presets.P1_PRESET.gear,
-					2: Presets.P2_PRESET.gear,
-					3: Presets.P3_PRESET_ALLI.gear,
-					4: Presets.P4_PRESET_ALLI.gear,
+					1: Presets.PreraidPresetGear.gear,
 				},
 				[Faction.Horde]: {
-					1: Presets.P1_PRESET.gear,
-					2: Presets.P2_PRESET.gear,
-					3: Presets.P3_PRESET_HORDE.gear,
-					4: Presets.P4_PRESET_HORDE.gear,
+					1: Presets.PreraidPresetGear.gear,
 				},
 			},
 		},

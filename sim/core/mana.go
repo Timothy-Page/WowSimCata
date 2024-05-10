@@ -15,12 +15,12 @@ type manaBar struct {
 	unit     *Unit
 	BaseMana float64
 
-	currentMana           float64
-	manaCastingMetrics    *ResourceMetrics
-	manaNotCastingMetrics *ResourceMetrics
-	JowManaMetrics        *ResourceMetrics
-	VtManaMetrics         *ResourceMetrics
-	JowiseManaMetrics     *ResourceMetrics
+	currentMana          float64
+	manaCombatMetrics    *ResourceMetrics
+	manaNotCombatMetrics *ResourceMetrics
+	JowManaMetrics       *ResourceMetrics
+	VtManaMetrics        *ResourceMetrics
+	JowiseManaMetrics    *ResourceMetrics
 
 	ReplenishmentAura *Aura
 
@@ -45,16 +45,19 @@ func (character *Character) EnableManaBarWithModifier(modifier float64) {
 	character.AddStat(stats.Mana, 20-15*20*modifier)
 	character.AddStatDependency(stats.Intellect, stats.Mana, 15*modifier)
 
-	// Starting with cataclysm 1 intellect now provides 1 spell power
-	character.AddStatDependency(stats.Intellect, stats.SpellPower, 1.0)
-
-	// first 10 int should not count so remove them
-	character.AddStat(stats.SpellPower, -10)
+	// Starting with cataclysm you get mp5 equal 5% of your base mana
+	character.AddStat(stats.MP5, character.baseStats[stats.Mana]*0.05)
 
 	if character.Unit.Type == PlayerUnit {
-		// Every caster gains 1% crit per 648.91
-		// Pets have different scaling so let them handle their scaling
-		character.AddStatDependency(stats.Intellect, stats.SpellCrit, 1.0/648.91*CritRatingPerCritChance)
+		// Pets might have different scaling so let them handle their scaling
+		character.AddStatDependency(stats.Intellect, stats.SpellCrit,
+			CritPerIntMaxLevel[character.Class]*CritRatingPerCritChance)
+
+		// Starting with cataclysm 1 intellect now provides 1 spell power
+		character.AddStatDependency(stats.Intellect, stats.SpellPower, 1.0)
+
+		// first 10 int should not count so remove them
+		character.AddStat(stats.SpellPower, -10)
 	}
 
 	// Not a real spell, just holds metrics from mana gain threat.
@@ -62,8 +65,8 @@ func (character *Character) EnableManaBarWithModifier(modifier float64) {
 		ActionID: ActionID{OtherID: proto.OtherAction_OtherActionManaGain},
 	})
 
-	character.manaCastingMetrics = character.NewManaMetrics(ActionID{OtherID: proto.OtherAction_OtherActionManaRegen, Tag: 1})
-	character.manaNotCastingMetrics = character.NewManaMetrics(ActionID{OtherID: proto.OtherAction_OtherActionManaRegen, Tag: 2})
+	character.manaCombatMetrics = character.NewManaMetrics(ActionID{OtherID: proto.OtherAction_OtherActionManaRegen, Tag: 1})
+	character.manaNotCombatMetrics = character.NewManaMetrics(ActionID{OtherID: proto.OtherAction_OtherActionManaRegen, Tag: 2})
 
 	character.BaseMana = character.GetBaseStats()[stats.Mana]
 	character.Unit.manaBar.unit = &character.Unit
@@ -139,7 +142,7 @@ func (mb *manaBar) doneIteration(sim *Simulation) {
 			// Vampiric Touch mana threat goes to the priest, so it's handled in the priest code.
 			continue
 		}
-		if resourceMetrics.ActualGain <= 0 {
+		if resourceMetrics.ActualGainForCurrentIteration() <= 0 {
 			continue
 		}
 
@@ -160,14 +163,14 @@ func (unit *Unit) SpiritManaRegenPerSecond() float64 {
 
 // Returns the rate of mana regen per second, assuming this unit is
 // considered to be casting.
-func (unit *Unit) ManaRegenPerSecondWhileCasting() float64 {
+func (unit *Unit) ManaRegenPerSecondWhileCombat() float64 {
 	regenRate := unit.MP5ManaRegenPerSecond()
 
 	spiritRegenRate := 0.0
-	if unit.PseudoStats.SpiritRegenRateCasting != 0 || unit.PseudoStats.ForceFullSpiritRegen {
+	if unit.PseudoStats.SpiritRegenRateCombat != 0 || unit.PseudoStats.ForceFullSpiritRegen {
 		spiritRegenRate = unit.SpiritManaRegenPerSecond() * unit.PseudoStats.SpiritRegenMultiplier
 		if !unit.PseudoStats.ForceFullSpiritRegen {
-			spiritRegenRate *= unit.PseudoStats.SpiritRegenRateCasting
+			spiritRegenRate *= unit.PseudoStats.SpiritRegenRateCombat
 		}
 	}
 	regenRate += spiritRegenRate
@@ -177,7 +180,7 @@ func (unit *Unit) ManaRegenPerSecondWhileCasting() float64 {
 
 // Returns the rate of mana regen per second, assuming this unit is
 // considered to be not casting.
-func (unit *Unit) ManaRegenPerSecondWhileNotCasting() float64 {
+func (unit *Unit) ManaRegenPerSecondWhileNotCombat() float64 {
 	regenRate := unit.MP5ManaRegenPerSecond()
 
 	regenRate += unit.SpiritManaRegenPerSecond() * unit.PseudoStats.SpiritRegenMultiplier
@@ -186,18 +189,18 @@ func (unit *Unit) ManaRegenPerSecondWhileNotCasting() float64 {
 }
 
 func (unit *Unit) UpdateManaRegenRates() {
-	unit.manaTickWhileCasting = unit.ManaRegenPerSecondWhileCasting() * 2
-	unit.manaTickWhileNotCasting = unit.ManaRegenPerSecondWhileNotCasting() * 2
+	unit.manaTickWhileCombat = unit.ManaRegenPerSecondWhileCombat() * 2
+	unit.manaTickWhileNotCombat = unit.ManaRegenPerSecondWhileNotCombat() * 2
 }
 
 // Applies 1 'tick' of mana regen, which worth 2s of regeneration based on mp5/int/spirit/etc.
 func (unit *Unit) ManaTick(sim *Simulation) {
-	if sim.CurrentTime < unit.PseudoStats.FiveSecondRuleRefreshTime {
-		regen := unit.manaTickWhileCasting
-		unit.AddMana(sim, max(0, regen), unit.manaCastingMetrics)
+	if sim.CurrentTime > 0 {
+		regen := unit.manaTickWhileCombat
+		unit.AddMana(sim, max(0, regen), unit.manaCombatMetrics)
 	} else {
-		regen := unit.manaTickWhileNotCasting
-		unit.AddMana(sim, max(0, regen), unit.manaNotCastingMetrics)
+		regen := unit.manaTickWhileNotCombat
+		unit.AddMana(sim, max(0, regen), unit.manaNotCombatMetrics)
 	}
 }
 
@@ -211,7 +214,7 @@ func (unit *Unit) TimeUntilManaRegen(desiredMana float64) time.Duration {
 	manaNeeded := desiredMana - unit.CurrentMana()
 	regenTime := NeverExpires
 
-	regenWhileCasting := unit.ManaRegenPerSecondWhileCasting()
+	regenWhileCasting := unit.ManaRegenPerSecondWhileCombat()
 	if regenWhileCasting != 0 {
 		regenTime = DurationFromSeconds(manaNeeded/regenWhileCasting) + 1
 	}
@@ -223,7 +226,7 @@ func (unit *Unit) TimeUntilManaRegen(desiredMana float64) time.Duration {
 		regenTime = time.Second * 5
 		manaNeeded -= regenWhileCasting * 5
 		// now we move into spirit based regen.
-		regenTime += DurationFromSeconds(manaNeeded / unit.ManaRegenPerSecondWhileNotCasting())
+		regenTime += DurationFromSeconds(manaNeeded / unit.ManaRegenPerSecondWhileNotCombat())
 	}
 
 	return regenTime
@@ -304,14 +307,16 @@ type ManaCost struct {
 }
 
 func newManaCost(spell *Spell, options ManaCostOptions) *ManaCost {
-	baseCost := TernaryFloat64(options.FlatCost > 0, options.FlatCost, options.BaseCost*spell.Unit.BaseMana)
+	baseCost := TernaryFloat64(options.FlatCost > 0, options.FlatCost, math.Floor(options.BaseCost*spell.Unit.BaseMana))
 	if player := spell.Unit.Env.Raid.GetPlayerFromUnit(spell.Unit); player != nil {
 		if player.GetCharacter().HasTrinketEquipped(45703) { // Spark of Hope
 			baseCost = max(0, baseCost-44)
+		} else if player.GetCharacter().HasTrinketEquipped(60233) { // Shard of Woe
+			baseCost = max(0, baseCost-205)
 		}
 	}
 
-	spell.DefaultCast.Cost = baseCost * TernaryFloat64(options.Multiplier == 0, 1, options.Multiplier)
+	spell.DefaultCast.Cost = math.Floor(baseCost * TernaryFloat64(options.Multiplier == 0, 1, options.Multiplier))
 
 	return &ManaCost{
 		ResourceMetrics: spell.Unit.NewManaMetrics(spell.ActionID),
@@ -345,7 +350,6 @@ func (mc *ManaCost) CostFailureReason(sim *Simulation, spell *Spell) string {
 func (mc *ManaCost) SpendCost(sim *Simulation, spell *Spell) {
 	if spell.CurCast.Cost > 0 {
 		spell.Unit.SpendMana(sim, spell.CurCast.Cost, mc.ResourceMetrics)
-		spell.Unit.PseudoStats.FiveSecondRuleRefreshTime = max(sim.CurrentTime+time.Second*5, spell.Unit.Hardcast.Expires)
 	}
 }
 func (mc *ManaCost) IssueRefund(_ *Simulation, _ *Spell) {}

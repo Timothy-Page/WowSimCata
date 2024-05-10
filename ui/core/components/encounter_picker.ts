@@ -128,10 +128,11 @@ export class EncounterPicker extends Component {
 
 			makeTargetInputsPicker(this.rootElem, modEncounter, 0);
 
+			const advancedModal = new AdvancedEncounterModal(simUI.rootElem, simUI, modEncounter);
 			const advancedButton = document.createElement('button');
 			advancedButton.classList.add('advanced-button', 'btn', 'btn-primary');
 			advancedButton.textContent = 'Advanced';
-			advancedButton.addEventListener('click', () => new AdvancedEncounterModal(simUI.rootElem, simUI, modEncounter));
+			advancedButton.addEventListener('click', () => advancedModal.open());
 			this.rootElem.appendChild(advancedButton);
 		});
 	}
@@ -184,6 +185,7 @@ class AdvancedEncounterModal extends BaseModal {
 				index: number,
 				config: ListItemPickerConfig<Encounter, TargetProto>,
 			) => new TargetPicker(parent, encounter, index, config),
+			minimumItems: 1,
 		});
 	}
 
@@ -245,9 +247,9 @@ class TargetPicker extends Input<Encounter, TargetProto> {
 			<div class="target-picker-section target-picker-section3 threat-metrics"></div>
 		`;
 
-		const section1 = this.rootElem.getElementsByClassName('target-picker-section1')[0] as HTMLElement;
-		const section2 = this.rootElem.getElementsByClassName('target-picker-section2')[0] as HTMLElement;
-		const section3 = this.rootElem.getElementsByClassName('target-picker-section3')[0] as HTMLElement;
+		const section1 = this.rootElem.querySelector('.target-picker-section1') as HTMLElement;
+		const section2 = this.rootElem.querySelector('.target-picker-section2') as HTMLElement;
+		const section3 = this.rootElem.querySelector('.target-picker-section3') as HTMLElement;
 
 		const presetTargets = encounter.sim.db.getAllPresetTargets();
 		new EnumPicker<null>(section1, null, {
@@ -652,9 +654,8 @@ function addEncounterFieldPickers(rootElem: HTMLElement, encounter: Encounter, s
 			},
 		});
 		new NumberPicker(executeGroup, encounter, {
-			label: 'Execute Duration 90 (%)',
-			labelTooltip:
-				'Percentage of the total encounter duration, for which the targets will be considered to be in range (>= 90% HP) for the purpose of effects like Hunter Careful Aim',
+			label: 'Duration spent below high-HP regime (%)',
+			labelTooltip: 'Percentage of the total encounter duration, for which the targets are considered out of range for effects like Hunter Careful Aim (<90% HP) or Druid Predatory Strikes (<80% HP).',
 			changedEvent: (encounter: Encounter) => encounter.changeEmitter,
 			getValue: (encounter: Encounter) => encounter.getExecuteProportion90() * 100,
 			setValue: (eventID: EventID, encounter: Encounter, newValue: number) => {
@@ -689,10 +690,10 @@ function makeTargetInputsPicker(parent: HTMLElement, encounter: Encounter, targe
 }
 
 function equalTargetsIgnoreInputs(target1: TargetProto | undefined, target2: TargetProto | undefined): boolean {
-	if ((target1 == null) != (target2 == null)) {
+	if (!!target1 != !!target2) {
 		return false;
 	}
-	if (target1 == null) {
+	if (!target1) {
 		return true;
 	}
 	const modTarget2 = TargetProto.clone(target2!);
@@ -709,7 +710,6 @@ const ALL_TARGET_STATS: Array<{ stat: Stat; tooltip: string; extraCssClasses: Ar
 	{ stat: Stat.StatNatureResistance, tooltip: '', extraCssClasses: [] },
 	{ stat: Stat.StatShadowResistance, tooltip: '', extraCssClasses: [] },
 	{ stat: Stat.StatAttackPower, tooltip: '', extraCssClasses: ['threat-metrics'] },
-	{ stat: Stat.StatBlockValue, tooltip: '', extraCssClasses: ['threat-metrics'] },
 ];
 
 const mobTypeEnumValues = [

@@ -13,6 +13,13 @@ var TalentTreeSizes = [3]int{19, 19, 20}
 // Start looking to refresh 5 minute totems at 4:55.
 const TotemRefreshTime5M = time.Second * 295
 
+// Damage Done By Caster setup
+const (
+	DDBC_T12P2 int = iota
+
+	DDBC_Total
+)
+
 const (
 	SpellFlagShock     = core.SpellFlagAgentReserved1
 	SpellFlagElectric  = core.SpellFlagAgentReserved2
@@ -25,8 +32,12 @@ func NewShaman(character *core.Character, talents string, totems *proto.ShamanTo
 		Character:           *character,
 		Talents:             &proto.ShamanTalents{},
 		Totems:              totems,
+		TotemElements:       totems.Elements,
+		TotemsAncestors:     totems.Ancestors,
+		TotemsSpirits:       totems.Spirits,
 		SelfBuffs:           selfBuffs,
 		ThunderstormInRange: thunderstormRange,
+		ClassSpellScaling:   core.GetClassSpellScalingCoefficient(proto.Class_ClassShaman),
 	}
 	// shaman.waterShieldManaMetrics = shaman.NewManaMetrics(core.ActionID{SpellID: 57960})
 
@@ -51,6 +62,7 @@ func NewShaman(character *core.Character, talents string, totems *proto.ShamanTo
 	}
 
 	shaman.FireElemental = shaman.NewFireElemental(float64(totems.BonusSpellpower))
+	shaman.EarthElemental = shaman.NewEarthElemental(float64(totems.BonusSpellpower))
 	return shaman
 }
 
@@ -73,12 +85,17 @@ const (
 type Shaman struct {
 	core.Character
 
+	ClassSpellScaling float64
+
 	ThunderstormInRange bool // flag if thunderstorm will be in range.
 
 	Talents   *proto.ShamanTalents
 	SelfBuffs SelfBuffs
 
-	Totems *proto.ShamanTotems
+	Totems          *proto.ShamanTotems
+	TotemElements   *proto.TotemSet
+	TotemsAncestors *proto.TotemSet
+	TotemsSpirits   *proto.TotemSet
 
 	// The expiration time of each totem (earth, air, fire, water).
 	TotemExpirations [4]time.Duration
@@ -114,6 +131,9 @@ type Shaman struct {
 
 	FireElemental      *FireElemental
 	FireElementalTotem *core.Spell
+
+	EarthElemental      *EarthElemental
+	EarthElementalTotem *core.Spell
 
 	MagmaTotem           *core.Spell
 	ManaSpringTotem      *core.Spell
@@ -215,6 +235,7 @@ func (shaman *Shaman) AddRaidBuffs(raidBuffs *proto.RaidBuffs) {
 func (shaman *Shaman) Initialize() {
 	shaman.registerChainLightningSpell()
 	shaman.registerFireElementalTotem()
+	shaman.registerEarthElementalTotem()
 	shaman.registerFireNovaSpell()
 	shaman.registerLavaBurstSpell()
 	shaman.registerLightningBoltSpell()
@@ -235,6 +256,8 @@ func (shaman *Shaman) Initialize() {
 
 	// // This registration must come after all the totems are registered
 	shaman.registerCallOfTheElements()
+	shaman.registerCallOfTheAncestors()
+	shaman.registerCallOfTheSpirits()
 
 	shaman.registerBloodlustCD()
 	// shaman.NewTemporaryStatsAura("DC Pre-Pull SP Proc", core.ActionID{SpellID: 60494}, stats.Stats{stats.SpellPower: 765}, time.Second*10)
@@ -297,6 +320,7 @@ func (shaman *Shaman) GetMentalQuicknessBonus() float64 {
 const (
 	SpellMaskNone               int64 = 0
 	SpellMaskFireElementalTotem int64 = 1 << iota
+	SpellMaskEarthElementalTotem
 	SpellMaskFlameShockDirect
 	SpellMaskFlameShockDot
 	SpellMaskLavaBurst
@@ -320,6 +344,7 @@ const (
 	SpellMaskUnleashFrost
 	SpellMaskUnleashFlame
 	SpellMaskEarthquake
+	SpellMaskFlametongueWeapon
 
 	SpellMaskFlameShock = SpellMaskFlameShockDirect | SpellMaskFlameShockDot
 	SpellMaskFire       = SpellMaskFlameShock | SpellMaskLavaBurst | SpellMaskLavaBurstOverload | SpellMaskLavaLash | SpellMaskFireNova | SpellMaskUnleashFlame
